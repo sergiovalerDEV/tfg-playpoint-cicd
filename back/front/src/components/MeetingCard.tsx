@@ -36,6 +36,7 @@ interface MeetingCardProps {
   getSportIcon: (sportName: string) => string
   getSportImageUrl: (deporte: any) => string
   theme?: "light" | "dark"
+  isJoinedTab?: boolean // Nueva prop para identificar si estamos en la pestaña "Inscritas"
 }
 
 const MeetingCard: React.FC<MeetingCardProps> = ({
@@ -46,6 +47,7 @@ const MeetingCard: React.FC<MeetingCardProps> = ({
   getSportIcon,
   getSportImageUrl,
   theme = "light",
+  isJoinedTab = false, // Por defecto, asumimos que no estamos en la pestaña "Inscritas"
 }) => {
   const isDark = theme === "dark"
   const BORDER_RADIUS = 8 // Consistent border radius for all elements
@@ -80,8 +82,17 @@ const MeetingCard: React.FC<MeetingCardProps> = ({
   // Obtener la ubicación de forma segura
   const location = meeting.localizacion || meeting.local?.nombre || "Location"
 
+  // Seleccionar el estilo de la tarjeta según la pestaña
+  const cardStyle = isJoinedTab
+    ? isDark
+      ? styles.joinedCardDark
+      : styles.joinedCard
+    : isDark
+    ? styles.cardDark
+    : styles.card
+
   return (
-    <View style={[isDark ? styles.cardDark : styles.card, { borderRadius: BORDER_RADIUS }]}>
+    <View style={[cardStyle, { borderRadius: BORDER_RADIUS }]}>
       {/* Imagen con overlay y título - Ahora clickeable */}
       <TouchableOpacity activeOpacity={0.9} onPress={handleNavigateToDetails}>
         <ImageBackground
@@ -152,14 +163,14 @@ const MeetingCard: React.FC<MeetingCardProps> = ({
             <View style={styles.infoItem}>
               <Ionicons name="person" size={16} color={isDark ? "#4CAF50" : "#006400"} />
               <Text style={isDark ? styles.infoTextDark : styles.infoText}>
-                Created by <Text style={styles.creatorName}>{meeting.creador.nombre || "Unknown"}</Text>
+                Creada por <Text style={styles.creatorName}>{meeting.creador.nombre || "Unknown"}</Text>
               </Text>
             </View>
           )}
         </View>
 
-        {/* Separador */}
-        <View style={isDark ? styles.dividerDark : styles.divider} />
+        {/* Separador - Solo mostrar en la pestaña "Creadas" */}
+        {!isJoinedTab && <View style={isDark ? styles.dividerDark : styles.divider} />}
 
         {/* Botón de acción */}
         <View style={styles.buttonContainer}>
@@ -182,7 +193,7 @@ const MeetingCard: React.FC<MeetingCardProps> = ({
             onPress={handleNavigateToDetails}
             activeOpacity={0.7}
           >
-            <Text style={styles.buttonText}>See Meeting</Text>
+            <Text style={styles.buttonText}>Ver quedada</Text>
             <Ionicons name="arrow-forward-circle" size={18} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
@@ -192,6 +203,7 @@ const MeetingCard: React.FC<MeetingCardProps> = ({
 }
 
 const styles = StyleSheet.create({
+  // Estilos normales para la pestaña "Creadas"
   card: {
     backgroundColor: "#FFFFFF",
     marginBottom: 16,
@@ -205,6 +217,31 @@ const styles = StyleSheet.create({
     borderColor: "#eaeaea",
   },
   cardDark: {
+    backgroundColor: "#1E1E1E",
+    marginBottom: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#333",
+  },
+  // Estilos específicos para la pestaña "Inscritas" - SIN BORDES INFERIORES
+  joinedCard: {
+    backgroundColor: "#FFFFFF",
+    marginBottom: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#eaeaea",
+  },
+  joinedCardDark: {
     backgroundColor: "#1E1E1E",
     marginBottom: 16,
     overflow: "hidden",

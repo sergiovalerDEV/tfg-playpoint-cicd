@@ -731,9 +731,11 @@ const MyMeetings: React.FC<Props> = ({ navigation }) => {
           const isClosing = closingMeetingId === meeting.id
           const isPuntuada = meeting.puntuada || false
 
-          return (
-            <View key={meeting.id} style={styles.meetingCardContainer}>
+          if (activeTab === "joined") {
+            // Para la pestaña "Inscritas", renderizar solo el MeetingCard sin espacio adicional
+            return (
               <MeetingCard
+                key={meeting.id}
                 meeting={meeting}
                 onPress={() => navigateToMeetingDetails(meeting.id)}
                 formatDateForDisplay={MyMeetingsService.formatDate}
@@ -742,9 +744,21 @@ const MyMeetings: React.FC<Props> = ({ navigation }) => {
                 getSportImageUrl={getSportImageUrl}
                 theme={theme}
               />
+            )
+          } else {
+            // Para la pestaña "Creadas", mantener el contenedor con espacio adicional para botones
+            return (
+              <View key={meeting.id} style={styles.createdMeetingCardContainer}>
+                <MeetingCard
+                  meeting={meeting}
+                  onPress={() => navigateToMeetingDetails(meeting.id)}
+                  formatDateForDisplay={MyMeetingsService.formatDate}
+                  formatTimeForDisplay={MyMeetingsService.formatTime}
+                  getSportIcon={MyMeetingsService.getSportIcon}
+                  getSportImageUrl={getSportImageUrl}
+                  theme={theme}
+                />
 
-              {/* Botones de acción para la pestaña "Creadas" */}
-              {activeTab === "created" && (
                 <View style={styles.buttonsRow}>
                   {/* Lado izquierdo: Estado de la quedada */}
                   <View style={styles.leftButtonContainer}>
@@ -804,9 +818,9 @@ const MyMeetings: React.FC<Props> = ({ navigation }) => {
                     )}
                   </View>
                 </View>
-              )}
-            </View>
-          )
+              </View>
+            )
+          }
         })}
 
         {/* Add padding at the bottom for better scrolling */}
@@ -999,7 +1013,8 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
   },
-  meetingCardContainer: {
+  // Contenedor específico para tarjetas en la pestaña "Creadas"
+  createdMeetingCardContainer: {
     marginBottom: 16,
     borderRadius: 8,
     overflow: "hidden",

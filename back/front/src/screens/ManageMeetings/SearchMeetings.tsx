@@ -222,7 +222,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
 
         // Check if it's an authentication error
         if (error instanceof Error && error.message.includes("session has expired")) {
-          Alert.alert("Session Expired", "Your session has expired. Please login again.", [
+          Alert.alert("Sesión expirada", "Tu sesión ha expirado. Por favor, loguéate de nuevo.", [
             { text: "OK", onPress: () => navigation.navigate("Login") },
           ])
         }

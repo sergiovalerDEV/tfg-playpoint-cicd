@@ -157,7 +157,7 @@ const Register: React.FC<Props> = ({ navigation }) => {
     if (enteredCode === verificationCode) {
       setIsEmailVerified(true)
       setShowVerificationModal(false)
-      Alert.alert("Success", "Email verified successfully!")
+      Alert.alert("Éxito", "Email verificado correctamente!")
     } else {
       setVerificationError("Invalid verification code. Please try again.")
     }
