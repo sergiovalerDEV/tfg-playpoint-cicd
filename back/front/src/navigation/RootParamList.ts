@@ -1,5 +1,6 @@
 import { Grupo } from "../models/Group"
 import type { Meeting } from "../models/Meeting"
+import type { Sport } from "../services/ManageMeetings/CreateMeetingService"
 
 export type RootParamList = {
   // Auth screens
@@ -14,6 +15,7 @@ export type RootParamList = {
   }
   CreateMeeting: undefined
   PuntuarEquipos: { quedadaId: number } // Nueva pantalla para puntuar equipos
+  AllSports: { sports: Sport[], selectedSportId?: number, theme: string } // Nueva pantalla para ver todos los deportes
 
   // User account screens
   MyAccount: undefined

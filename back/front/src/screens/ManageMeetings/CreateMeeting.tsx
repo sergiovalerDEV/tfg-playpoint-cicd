@@ -9,7 +9,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  ScrollView,
+  FlatList,
   SafeAreaView,
   StatusBar,
   Switch,
@@ -34,7 +34,13 @@ import MainPageHeader from "../../components/headers/MainPageHeader"
 
 type Props = StackScreenProps<RootParamList, "CreateMeeting">
 
-const CreateMeeting: React.FC<Props> = ({ navigation }) => {
+// Definir los tipos de secciones para el renderizado
+type FormSection = {
+  id: string
+  type: "meetingName" | "sport" | "establishment" | "date" | "timeRow" | "location" | "competitive" | "button"
+}
+
+const CreateMeeting: React.FC<Props> = ({ navigation, route }) => {
   // Obtener contexto de tema
   const { theme } = useTheme()
   const isDark = theme === "dark"
@@ -75,6 +81,21 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
   const [selectedEstablishment, setSelectedEstablishment] = useState<Establishment | null>(null)
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null)
   const [showEstablishmentDropdown, setShowEstablishmentDropdown] = useState(false)
+  
+  // Número máximo de deportes a mostrar en la vista principal
+  const MAX_VISIBLE_SPORTS = 6
+
+  // Definir las secciones del formulario para FlatList
+  const formSections: FormSection[] = [
+    { id: "meetingName", type: "meetingName" },
+    { id: "sport", type: "sport" },
+    { id: "establishment", type: "establishment" },
+    { id: "date", type: "date" },
+    { id: "timeRow", type: "timeRow" },
+    { id: "location", type: "location" },
+    { id: "competitive", type: "competitive" },
+    { id: "button", type: "button" },
+  ]
 
   // Cargar fuentes
   const [fontsLoaded] = useFonts({
@@ -83,23 +104,59 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
     "Inter-SemiBold": require("../../assets/Inter_18pt-SemiBold.ttf"),
   })
 
-  // Función para resetear todos los campos del formulario
-  const resetForm = () => {
+  // Verificar si hay un deporte seleccionado desde la pantalla AllSports
+  useEffect(() => {
+    if (route.params?.selectedSport) {
+      setSelectedSport(route.params.selectedSport)
+    }
+  }, [route.params])
+
+  // Funciones para limpiar campos individuales
+  const clearMeetingName = () => {
     setMeetingName("")
+  }
+
+  const clearLocation = () => {
     setLocation("")
-    setIsCompetitive(false)
+  }
+
+  const clearSport = () => {
+    setSelectedSport(null)
+  }
+
+  const clearEstablishment = () => {
+    setSelectedEstablishment(null)
+  }
+
+  const clearDate = () => {
     setSelectedDay(null)
     setSelectedMonth(null)
     setSelectedYear(null)
     setFormattedDate("")
+  }
+
+  const clearStartTime = () => {
     setStartHour(null)
     setStartMinute(null)
     setFormattedStartTime("")
+  }
+
+  const clearEndTime = () => {
     setEndHour(null)
     setEndMinute(null)
     setFormattedEndTime("")
-    setSelectedEstablishment(null)
-    setSelectedSport(null)
+  }
+
+  // Función para resetear todos los campos del formulario
+  const resetForm = () => {
+    clearMeetingName()
+    clearLocation()
+    setIsCompetitive(false)
+    clearDate()
+    clearStartTime()
+    clearEndTime()
+    clearEstablishment()
+    clearSport()
     setShowEstablishmentDropdown(false)
   }
 
@@ -298,6 +355,15 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
     setFormattedEndTime(formattedTime)
   }
 
+  // Función para navegar a la pantalla de todos los deportes
+  const navigateToAllSports = () => {
+    navigation.navigate("AllSports", {
+      sports: sports,
+      selectedSportId: selectedSport?.id,
+      theme: theme
+    })
+  }
+
   // Función para crear la quedada
   const handleCreateMeeting = async () => {
     // Validar campos requeridos
@@ -413,189 +479,244 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
     }
   }
 
-  if (!fontsLoaded || loadingData) {
-    return (
-      <SafeAreaView style={isDark ? styles.containerDark : styles.container}>
-        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#121212" : "#fff"} />
-        <View style={isDark ? styles.loadingContainerDark : styles.loadingContainer}>
-          <ActivityIndicator size="large" color={isDark ? "#4CAF50" : "#006400"} />
-          <Text style={isDark ? styles.loadingTextDark : styles.loadingText}>Cargando...</Text>
-        </View>
-      </SafeAreaView>
-    )
-  }
-
-  return (
-    <AlertProvider>
-      <SafeAreaView style={isDark ? styles.containerDark : styles.container}>
-        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#121212" : "#fff"} />
-
-        <MainPageHeader text="Crear Quedada" isDark={isDark}></MainPageHeader>
-
-        <ScrollView style={isDark ? styles.contentDark : styles.content} showsVerticalScrollIndicator={false}>
-
-          {/* Nombre de la Quedada */}
-          <View style={isDark ? styles.formGroupDark : styles.formGroup}>
-            <Text style={isDark ? styles.labelDark : styles.label}>Nombre de la Quedada</Text>
-            <TextInput
-              style={isDark ? styles.inputDark : styles.input}
-              placeholder="Introduce el nombre de la quedada"
-              placeholderTextColor={isDark ? "#8A8A8A" : "#BDBBC7"}
-              value={meetingName}
-              onChangeText={setMeetingName}
-            />
+  // Renderizar cada sección del formulario
+  const renderFormSection = ({ item }: { item: FormSection }) => {
+    switch (item.type) {
+      case "meetingName":
+        return (
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Nombre de la Quedada</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                placeholder="Introduce el nombre de la quedada"
+                placeholderTextColor="#BDBBC7"
+                value={meetingName}
+                onChangeText={setMeetingName}
+              />
+              {meetingName.trim() !== "" && (
+                <TouchableOpacity style={styles.clearInputButton} onPress={clearMeetingName}>
+                  <Ionicons name="close-circle" size={16} color="#BDBBC7" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
+        )
 
-          {/* Deporte - Ahora mostramos directamente la lista de deportes */}
-          <View style={isDark ? styles.formGroupDark : styles.formGroup}>
-            {/* Mostrar SportsList directamente sin toggle */}
-            <SportsList
-              sports={sports}
-              selectedSport={selectedSport}
-              onSelectSport={(sport) => setSelectedSport(sport)}
-              getSportIcon={SearchMeetingsService.getSportIcon}
-              theme={theme}
-            />
+      case "sport":
+        return (
+          <View style={styles.formGroup}>
+            <View style={styles.sportHeaderContainer}>
+              <Text style={styles.label}>Deporte</Text>
+              {selectedSport && (
+                <TouchableOpacity style={styles.clearSportButton} onPress={clearSport}>
+                  <Text style={styles.clearSportText}>Limpiar</Text>
+                  <Ionicons name="close-circle" size={16} color="#BDBBC7" />
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            {/* Mostrar SportsList con número limitado de deportes */}
+            <View>
+              <SportsList
+                sports={sports.slice(0, MAX_VISIBLE_SPORTS)}
+                selectedSport={selectedSport}
+                onSelectSport={(sport) => setSelectedSport(sport)}
+                getSportIcon={SearchMeetingsService.getSportIcon}
+                theme={theme}
+              />
+              
+              {/* Botón "+" para ver todos los deportes si hay más del máximo */}
+              {sports.length > MAX_VISIBLE_SPORTS && (
+                <TouchableOpacity 
+                  style={styles.viewAllButton}
+                  onPress={navigateToAllSports}
+                >
+                  <Ionicons name="add-circle" size={20} color="#006400" />
+                  <Text style={styles.viewAllText}>
+                    Ver todos los deportes
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
+        )
 
-          {/* Establecimiento */}
-          <View style={isDark ? styles.formGroupDark : styles.formGroup}>
-            <Text style={isDark ? styles.labelDark : styles.label}>Establecimiento</Text>
-            <TouchableOpacity
-              style={isDark ? styles.dropdownDark : styles.dropdown}
-              onPress={() => setShowEstablishmentDropdown(!showEstablishmentDropdown)}
-            >
-              <Text
-                style={
-                  selectedEstablishment
-                    ? isDark
-                      ? styles.dropdownTextSelectedDark
-                      : styles.dropdownTextSelected
-                    : isDark
-                      ? styles.dropdownTextDark
-                      : styles.dropdownText
-                }
-              >
-                {selectedEstablishment ? selectedEstablishment.nombre : "Seleccionar establecimiento"}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color={isDark ? "#8A8A8A" : "#BDBBC7"} />
-            </TouchableOpacity>
-          </View>
+      case "establishment":
+        return (
+          <>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Establecimiento</Text>
+              <View style={styles.inputWrapper}>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => setShowEstablishmentDropdown(!showEstablishmentDropdown)}
+                >
+                  <Text
+                    style={
+                      selectedEstablishment
+                        ? styles.dropdownTextSelected
+                        : styles.dropdownText
+                    }
+                  >
+                    {selectedEstablishment ? selectedEstablishment.nombre : "Seleccionar establecimiento"}
+                  </Text>
+                  {!selectedEstablishment && (
+                    <Ionicons name="chevron-down" size={16} color="#BDBBC7" />
+                  )}
+                </TouchableOpacity>
+                {selectedEstablishment && (
+                  <TouchableOpacity style={styles.clearInputButton} onPress={clearEstablishment}>
+                    <Ionicons name="close-circle" size={16} color="#BDBBC7" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+            {/* Establishments List Dropdown */}
+            {showEstablishmentDropdown && (
+              <EstablishmentsList
+                establishments={establishments}
+                selectedEstablishment={selectedEstablishment}
+                onSelectEstablishment={setSelectedEstablishment}
+                onClose={() => setShowEstablishmentDropdown(false)}
+                theme={theme}
+              />
+            )}
+          </>
+        )
 
-          {/* Establishments List Dropdown */}
-          {showEstablishmentDropdown && (
-            <EstablishmentsList
-              establishments={establishments}
-              selectedEstablishment={selectedEstablishment}
-              onSelectEstablishment={setSelectedEstablishment}
-              onClose={() => setShowEstablishmentDropdown(false)}
-              theme={theme}
-            />
-          )}
-
-          {/* Fecha */}
-          <View style={isDark ? styles.formGroupDark : styles.formGroup}>
-            <Text style={isDark ? styles.labelDark : styles.label}>Fecha</Text>
-            <TouchableOpacity
-              style={isDark ? styles.dropdownDark : styles.dropdown}
-              onPress={() => {
-                initializeDate()
-                setShowDateModal(true)
-              }}
-            >
-              <Text
-                style={
-                  formattedDate
-                    ? isDark
-                      ? styles.dropdownTextSelectedDark
-                      : styles.dropdownTextSelected
-                    : isDark
-                      ? styles.dropdownTextDark
-                      : styles.dropdownText
-                }
-              >
-                {formattedDate || "Seleccionar fecha"}
-              </Text>
-              <Ionicons name="calendar-outline" size={16} color={isDark ? "#8A8A8A" : "#BDBBC7"} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Hora de Inicio y Fin */}
-          <View style={isDark ? styles.formRowDark : styles.formRow}>
-            <View style={[isDark ? styles.formGroupDark : styles.formGroup, { flex: 1 }]}>
-              <Text style={isDark ? styles.labelDark : styles.label}>Hora de Inicio</Text>
+      case "date":
+        return (
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Fecha</Text>
+            <View style={styles.inputWrapper}>
               <TouchableOpacity
-                style={isDark ? styles.dropdownDark : styles.dropdown}
+                style={styles.dropdown}
                 onPress={() => {
-                  initializeTime(true)
-                  setShowStartTimeModal(true)
+                  initializeDate()
+                  setShowDateModal(true)
                 }}
               >
                 <Text
                   style={
-                    formattedStartTime
-                      ? isDark
-                        ? styles.dropdownTextSelectedDark
-                        : styles.dropdownTextSelected
-                      : isDark
-                        ? styles.dropdownTextDark
-                        : styles.dropdownText
+                    formattedDate
+                      ? styles.dropdownTextSelected
+                      : styles.dropdownText
                   }
                 >
-                  {formattedStartTime || "Seleccionar"}
+                  {formattedDate || "Seleccionar fecha"}
                 </Text>
-                <Ionicons name="time-outline" size={16} color={isDark ? "#8A8A8A" : "#BDBBC7"} />
+                {!formattedDate && (
+                  <Ionicons name="calendar-outline" size={16} color="#BDBBC7" />
+                )}
               </TouchableOpacity>
+              {formattedDate !== "" && (
+                <TouchableOpacity style={styles.clearInputButton} onPress={clearDate}>
+                  <Ionicons name="close-circle" size={16} color="#BDBBC7" />
+                </TouchableOpacity>
+              )}
             </View>
+          </View>
+        )
 
-            <View style={[isDark ? styles.formGroupDark : styles.formGroup, { flex: 1, marginLeft: 10 }]}>
-              <Text style={isDark ? styles.labelDark : styles.label}>Hora de Fin</Text>
-              <TouchableOpacity
-                style={isDark ? styles.dropdownDark : styles.dropdown}
-                onPress={() => {
-                  initializeTime(false)
-                  setShowEndTimeModal(true)
-                }}
-              >
-                <Text
-                  style={
-                    formattedEndTime
-                      ? isDark
-                        ? styles.dropdownTextSelectedDark
-                        : styles.dropdownTextSelected
-                      : isDark
-                        ? styles.dropdownTextDark
-                        : styles.dropdownText
-                  }
+      case "timeRow":
+        return (
+          <View style={styles.formRow}>
+            <View style={[styles.formGroup, { flex: 1 }]}>
+              <Text style={styles.label}>Hora de Inicio</Text>
+              <View style={styles.inputWrapper}>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => {
+                    initializeTime(true)
+                    setShowStartTimeModal(true)
+                  }}
                 >
-                  {formattedEndTime || "Seleccionar"}
-                </Text>
-                <Ionicons name="time-outline" size={16} color={isDark ? "#8A8A8A" : "#BDBBC7"} />
-              </TouchableOpacity>
+                  <Text
+                    style={
+                      formattedStartTime
+                        ? styles.dropdownTextSelected
+                        : styles.dropdownText
+                    }
+                  >
+                    {formattedStartTime || "Seleccionar"}
+                  </Text>
+                  {!formattedStartTime && (
+                    <Ionicons name="time-outline" size={16} color="#BDBBC7" />
+                  )}
+                </TouchableOpacity>
+                {formattedStartTime !== "" && (
+                  <TouchableOpacity style={styles.clearInputButton} onPress={clearStartTime}>
+                    <Ionicons name="close-circle" size={16} color="#BDBBC7" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            <View style={[styles.formGroup, { flex: 1, marginLeft: 10 }]}>
+              <Text style={styles.label}>Hora de Fin</Text>
+              <View style={styles.inputWrapper}>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => {
+                    initializeTime(false)
+                    setShowEndTimeModal(true)
+                  }}
+                >
+                  <Text
+                    style={
+                      formattedEndTime
+                        ? styles.dropdownTextSelected
+                        : styles.dropdownText
+                    }
+                  >
+                    {formattedEndTime || "Seleccionar"}
+                  </Text>
+                  {!formattedEndTime && (
+                    <Ionicons name="time-outline" size={16} color="#BDBBC7" />
+                  )}
+                </TouchableOpacity>
+                {formattedEndTime !== "" && (
+                  <TouchableOpacity style={styles.clearInputButton} onPress={clearEndTime}>
+                    <Ionicons name="close-circle" size={16} color="#BDBBC7" />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
+        )
 
-          {/* Ubicación */}
-          <View style={isDark ? styles.formGroupDark : styles.formGroup}>
-            <Text style={isDark ? styles.labelDark : styles.label}>Ubicación</Text>
-            <TextInput
-              style={isDark ? styles.inputDark : styles.input}
-              placeholder="Introduce la ubicación"
-              placeholderTextColor={isDark ? "#8A8A8A" : "#BDBBC7"}
-              value={location}
-              onChangeText={setLocation}
-            />
+      case "location":
+        return (
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Ubicación</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                placeholder="Introduce la ubicación"
+                placeholderTextColor="#BDBBC7"
+                value={location}
+                onChangeText={setLocation}
+              />
+              {location.trim() !== "" && (
+                <TouchableOpacity style={styles.clearInputButton} onPress={clearLocation}>
+                  <Ionicons name="close-circle" size={16} color="#BDBBC7" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
+        )
 
-          {/* Quedada Competitiva */}
-          <View style={isDark ? styles.competitiveRowDark : styles.competitiveRow}>
-            <Text style={isDark ? styles.competitiveTextDark : styles.competitiveText}>
+      case "competitive":
+        return (
+          <View style={styles.competitiveRow}>
+            <Text style={styles.competitiveText}>
               Quedada {isCompetitive ? "Competitiva" : "No Competitiva"}
             </Text>
             <Switch
-              trackColor={{ false: isDark ? "#555" : "#D9D9D9", true: isDark ? "#2E7D32" : "#006400" }}
+              trackColor={{ false: "#D9D9D9", true: "#006400" }}
               thumbColor={"#FFFFFF"}
-              ios_backgroundColor={isDark ? "#555" : "#D9D9D9"}
+              ios_backgroundColor="#D9D9D9"
               onValueChange={(value) => {
                 setIsCompetitive(value)
                 console.log("Toggle cambiado a:", value, "Se enviará como:", value ? 1 : 0)
@@ -603,14 +724,16 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
               value={isCompetitive}
             />
           </View>
+        )
 
-          {/* Botones de acción */}
-          <View style={isDark ? styles.buttonRowDark : styles.buttonRow}>
+      case "button":
+        return (
+          <View style={styles.buttonRow}>
             {/* Botón Crear Quedada */}
             <TouchableOpacity
               style={[
-                isDark ? styles.createButtonDark : styles.createButton,
-                isLoading && (isDark ? styles.disabledButtonDark : styles.disabledButton),
+                styles.createButton,
+                isLoading && styles.disabledButton,
               ]}
               onPress={handleCreateMeeting}
               disabled={isLoading}
@@ -618,14 +741,44 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
               {isLoading ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text style={isDark ? styles.createButtonTextDark : styles.createButtonText}>Crear Quedada</Text>
+                <Text style={styles.createButtonText}>Crear Quedada</Text>
               )}
             </TouchableOpacity>
           </View>
+        )
 
-          {/* Añadir padding al final para mejor desplazamiento */}
-          <View style={{ height: 20 }} />
-        </ScrollView>
+      default:
+        return null
+    }
+  }
+
+  if (!fontsLoaded || loadingData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#006400" />
+          <Text style={styles.loadingText}>Cargando...</Text>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  return (
+    <AlertProvider>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
+        <MainPageHeader text="Crear Quedada" isDark={false}></MainPageHeader>
+
+        <FlatList
+          data={formSections}
+          renderItem={renderFormSection}
+          keyExtractor={(item) => item.id}
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          ListFooterComponent={<View style={{ height: 20 }} />}
+        />
 
         {/* Componente Calendario */}
         <Calendar
@@ -668,17 +821,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
-  containerDark: {
-    flex: 1,
-    backgroundColor: "#121212",
-  },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  headerDark: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -695,13 +838,6 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
   },
-  headerTitleDark: {
-    fontSize: 22,
-    fontFamily: "Inter-SemiBold",
-    color: "#4CAF50",
-    flex: 1,
-    textAlign: "center",
-  },
   backButton: {
     padding: 4,
   },
@@ -710,22 +846,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
   },
-  contentDark: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
   formGroup: {
     marginBottom: 16,
   },
-  formGroupDark: {
-    marginBottom: 16,
-  },
   formRow: {
-    flexDirection: "row",
-    marginBottom: 16,
-  },
-  formRowDark: {
     flexDirection: "row",
     marginBottom: 16,
   },
@@ -735,44 +859,35 @@ const styles = StyleSheet.create({
     color: "#006400",
     marginBottom: 6,
   },
-  labelDark: {
-    fontSize: 14,
-    fontFamily: "Inter-Medium",
-    color: "#4CAF50",
-    marginBottom: 6,
+  inputWrapper: {
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
   },
   input: {
+    flex: 1,
     height: 40,
     backgroundColor: "#EFF1F5",
     borderRadius: 8,
     paddingHorizontal: 12,
+    paddingRight: 36, // Espacio para el botón de limpiar
     fontFamily: "Inter-Regular",
     fontSize: 14,
     color: "#333",
   },
-  inputDark: {
-    height: 40,
-    backgroundColor: "#2A2A2A",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    color: "#E0E0E0",
+  clearInputButton: {
+    position: "absolute",
+    right: 10,
+    padding: 4,
+    zIndex: 1,
   },
   dropdown: {
+    flex: 1,
     height: 40,
     backgroundColor: "#EFF1F5",
     borderRadius: 8,
     paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  dropdownDark: {
-    height: 40,
-    backgroundColor: "#2A2A2A",
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    paddingRight: 36, // Espacio para el botón de limpiar
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -782,28 +897,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#BDBBC7",
   },
-  dropdownTextDark: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    color: "#8A8A8A",
-  },
   dropdownTextSelected: {
     fontFamily: "Inter-Regular",
     fontSize: 14,
     color: "#333",
   },
-  dropdownTextSelectedDark: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    color: "#E0E0E0",
+  sportHeaderContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
   },
-  competitiveRow: {
+  clearSportButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 24,
+    padding: 4,
   },
-  competitiveRowDark: {
+  clearSportText: {
+    fontFamily: "Inter-Regular",
+    fontSize: 12,
+    color: "#666",
+    marginRight: 4,
+  },
+  competitiveRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -814,15 +930,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333",
   },
-  competitiveTextDark: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    color: "#E0E0E0",
-  },
   buttonRow: {
-    marginBottom: 24,
-  },
-  buttonRowDark: {
     marginBottom: 24,
   },
   createButton: {
@@ -832,26 +940,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  createButtonDark: {
-    backgroundColor: "#2E7D32",
-    borderRadius: 8,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   disabledButton: {
     backgroundColor: "#88B288",
   },
-  disabledButtonDark: {
-    backgroundColor: "#1B5E20",
-    opacity: 0.7,
-  },
   createButtonText: {
-    color: "#FFFFFF",
-    fontFamily: "Inter-Medium",
-    fontSize: 14,
-  },
-  createButtonTextDark: {
     color: "#FFFFFF",
     fontFamily: "Inter-Medium",
     fontSize: 14,
@@ -861,23 +953,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  loadingContainerDark: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#121212",
-  },
   loadingText: {
     fontFamily: "Inter-Regular",
     fontSize: 16,
     color: "#666",
     marginTop: 12,
   },
-  loadingTextDark: {
-    fontFamily: "Inter-Regular",
-    fontSize: 16,
-    color: "#BBBBBB",
-    marginTop: 12,
+  // Nuevos estilos para el botón "Ver todos"
+  viewAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: "#F5F5F5",
+  },
+  viewAllText: {
+    fontFamily: "Inter-Medium",
+    fontSize: 14,
+    color: "#006400",
+    marginLeft: 6,
   },
 })
 

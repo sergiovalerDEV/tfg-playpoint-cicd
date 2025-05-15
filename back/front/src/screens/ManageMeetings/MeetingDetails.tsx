@@ -820,29 +820,12 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
 
   // Get sport image URL
   const getSportImageUrl = (deporte: any): string => {
-    // Use image from database if available
+    // Si el deporte tiene una imagen definida en la base de datos, usarla
     if (deporte && deporte.imagen) {
       return deporte.imagen
     }
 
-    // Select image based on sport
-    if (deporte && deporte.nombre) {
-      const sportName = deporte.nombre.toLowerCase()
-
-      if (sportName.includes("tenis") || sportName.includes("padel")) {
-        return "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1000"
-      } else if (sportName.includes("baloncesto") || sportName.includes("basket")) {
-        return "https://images.unsplash.com/photo-1546519638-68e109498ffc?q=80&w=1000"
-      } else if (sportName.includes("fútbol") || sportName.includes("futbol")) {
-        return "https://images.unsplash.com/photo-1599586120429-48281b6f0ece?q=80&w=1000"
-      } else if (sportName.includes("voleibol") || sportName.includes("voley")) {
-        return "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?q=80&w=1000"
-      } else if (sportName.includes("natación") || sportName.includes("swim")) {
-        return "https://images.unsplash.com/photo-1560090995-01632a28895b?q=80&w=1000"
-      }
-    }
-
-    // Generic sports image
+    // Imagen genérica para deportes si no hay imagen en la base de datos
     return "https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=1000"
   }
 

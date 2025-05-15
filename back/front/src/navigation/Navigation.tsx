@@ -22,7 +22,8 @@ import ChangeEmail from "../screens/User/Settings/ChangeEmail"
 import ChangePhoneNumber from "../screens/User/Settings/ChangePhoneNumber"
 import ChangeTheme from "../screens/User/Settings/ChangeTheme"
 import Notifications from "../screens/User/Settings/Notifications"
-import PuntuarEquipos from "../screens/ManageMeetings/PuntuarEquiposScreen" // Importar la nueva pantalla
+import PuntuarEquipos from "../screens/ManageMeetings/PuntuarEquiposScreen" // Importar la pantalla de puntuar equipos
+import AllSportsScreen from "../screens/ManageMeetings/AllSportsScreen" // Importar la nueva pantalla de deportes
 import { Search, Plus, User, MessageCircle } from "lucide-react-native"
 import { useTheme } from "../contexts/ThemeContext" // Importar el contexto de tema
 import { GroupsProvider } from "../contexts/GroupsContext"
@@ -80,10 +81,26 @@ const TabNavigator = () => {
       })}
     >
       <Tab.Screen name="SearchMeetings" component={SearchMeetingsStack} options={{ headerShown: false }} />
-      <Tab.Screen name="CreateMeeting" component={CreateMeeting} options={{ headerShown: false }} />
+      <Tab.Screen name="CreateMeeting" component={CreateMeetingStack} options={{ headerShown: false }} />
       <Tab.Screen name="MyAccount" component={MyAccountStack} options={{ headerShown: false }} />
       <Tab.Screen name="SocialGroups" component={SocialGroupsStack} options={{ headerShown: false }} />
     </Tab.Navigator>
+  )
+}
+
+// Nuevo stack para CreateMeeting que incluye AllSports
+const CreateMeetingStack = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: "transparent" },
+        headerTintColor: "#000",
+        headerTitleAlign: "left",
+      }}
+    >
+      <Stack.Screen name="CreateMeeting" component={CreateMeeting} options={{ headerShown: false }} />
+      <Stack.Screen name="AllSports" component={AllSportsScreen} options={{ headerShown: false }} />
+    </Stack.Navigator>
   )
 }
 
