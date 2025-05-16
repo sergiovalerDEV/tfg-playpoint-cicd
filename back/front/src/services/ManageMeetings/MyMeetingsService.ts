@@ -238,9 +238,9 @@ class MyMeetingsService {
 
       // Intentar extraer mensaje de error si existe
       let errorMessage = "Error al cerrar la quedada"
-      if (error.response && error.response.data && error.response.data.message) {
-        errorMessage = error.response.data.message
-      }
+      // if (error.response && error.response.data && error.response.data.message) {
+      //   errorMessage = error.response.data.message
+      // }
 
       return {
         success: false,

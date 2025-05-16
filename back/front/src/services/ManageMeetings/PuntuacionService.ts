@@ -41,18 +41,43 @@ class PuntuacionService {
       // Obtener instancia autenticada de axios
       const api = await UserService.getAuthenticatedAxios()
 
+      // Obtener detalles de la quedada para acceder al multiplicador del deporte
+      const response = await api.post("/quedada/filtrar", { id: quedadaId })
+
+      if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+        console.error("❌ No se pudo obtener información de la quedada")
+        return false
+      }
+
+      const quedada = response.data.find((q) => q.id === quedadaId)
+
+      if (!quedada) {
+        console.error("❌ No se encontró la quedada con el ID especificado")
+        return false
+      }
+
+      // Obtener el multiplicador del deporte (si existe)
+      const multiplicador = quedada.deporte?.multiplicador_puntuacion_competitiva || 1
+
+      // Aplicar el multiplicador a la puntuación
+      const puntuacionAjustada = Math.round(puntuacion * multiplicador * 10) / 10 // Redondear a 1 decimal
+
+      console.log(
+        `📊 Puntuación original: ${puntuacion}, Multiplicador: ${multiplicador}, Puntuación ajustada: ${puntuacionAjustada}`,
+      )
+
       // Crear DTO para enviar al backend
       const puntuacionDto: AnadirPuntuacionDto = {
-        puntuacion,
+        puntuacion: puntuacionAjustada,
         equipo: equipoId,
         quedada: quedadaId,
       }
 
       // Enviar petición al backend
-      const response = await api.post("/puntuacion/anadir", puntuacionDto)
+      const response2 = await api.post("/puntuacion/anadir", puntuacionDto)
 
-      console.log(`✅ Puntuación añadida correctamente:`, response.data)
-      
+      console.log(`✅ Puntuación añadida correctamente:`, response2.data)
+
       return true
     } catch (error) {
       console.error("❌ Error al añadir puntuación:", error)
@@ -69,16 +94,16 @@ class PuntuacionService {
   static async sumarPuntosCompetitivos(userId: number, puntos: number): Promise<boolean> {
     try {
       console.log(`🔺 Sumando ${puntos} puntos competitivos al usuario ${userId}`)
-      
+
       // Obtener instancia autenticada de axios
       const api = await UserService.getAuthenticatedAxios()
-      
+
       // Llamar al endpoint para sumar puntos
       const response = await api.post("/usuario/puntos/sumar", {
         id: userId,
-        puntos: puntos
+        puntos: puntos,
       })
-      
+
       console.log(`✅ Puntos competitivos sumados correctamente:`, response.data)
       return true
     } catch (error) {
@@ -96,16 +121,16 @@ class PuntuacionService {
   static async restarPuntosCompetitivos(userId: number, puntos: number): Promise<boolean> {
     try {
       console.log(`🔻 Restando ${puntos} puntos competitivos al usuario ${userId}`)
-      
+
       // Obtener instancia autenticada de axios
       const api = await UserService.getAuthenticatedAxios()
-      
+
       // Llamar al endpoint para restar puntos
       const response = await api.post("/usuario/puntos/restar", {
         id: userId,
-        puntos: puntos
+        puntos: puntos,
       })
-      
+
       console.log(`✅ Puntos competitivos restados correctamente:`, response.data)
       return true
     } catch (error) {
@@ -164,7 +189,7 @@ class PuntuacionService {
       return []
     }
   }
-  
+
   /**
    * Verifica si una quedada ya ha sido puntuada
    * @param quedadaId ID de la quedada
@@ -179,7 +204,7 @@ class PuntuacionService {
       return false
     }
   }
-  
+
   /**
    * Actualiza la puntuación competitiva basada en el resultado del partido
    * @param quedadaId ID de la quedada
@@ -188,49 +213,50 @@ class PuntuacionService {
   static async actualizarPuntuacionCompetitivaPorResultado(quedadaId: number): Promise<boolean> {
     try {
       console.log(`🏆 Actualizando puntuación competitiva basada en resultado para quedada ${quedadaId}`)
-      
+
       // Obtener todas las puntuaciones de la quedada
       const puntuaciones = await this.getPuntuacionesByQuedadaId(quedadaId)
-      
+
       if (puntuaciones.length === 0) {
         console.log(`ℹ️ No hay puntuaciones para la quedada ${quedadaId}`)
         return false
       }
-      
+
       // Obtener instancia autenticada de axios
       const api = await UserService.getAuthenticatedAxios()
-      
+
       // Obtener detalles de la quedada para acceder a los usuarios
       const response = await api.post("/quedada/filtrar", { id: quedadaId })
-      
+
       if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
         console.error("❌ No se pudo obtener información de la quedada")
         return false
       }
-      
-      const quedada = response.data[0]
-      
-      if (!quedada.usuarioquedada || !Array.isArray(quedada.usuarioquedada)) {
+
+      const quedada = response.data.find((q) => q.id === quedadaId)
+
+      if (!quedada || !quedada.usuarioquedada || !Array.isArray(quedada.usuarioquedada)) {
         console.error("❌ No hay información de usuarios en la quedada")
         return false
       }
-      
+
       // Verificar si hay empate (todas las puntuaciones son iguales)
       const hayEmpate = this.verificarEmpate(puntuaciones)
-      
+
       if (hayEmpate) {
         console.log(`🤝 Hay un empate en la quedada ${quedadaId}, todos los equipos reciben puntos`)
-        
+
         // En caso de empate, sumar puntos a todos los participantes
         for (const usuarioQuedada of quedada.usuarioquedada) {
           const userId = usuarioQuedada.usuario.id
           const equipoUsuario = usuarioQuedada.equipo
-          
+
           // Buscar la puntuación del equipo del usuario
-          const puntuacionEquipo = puntuaciones.find(p => p.equipo === equipoUsuario)
-          
+          const puntuacionEquipo = puntuaciones.find((p) => p.equipo === equipoUsuario)
+
           if (puntuacionEquipo) {
             // Sumar la puntuación del equipo a los puntos competitivos del usuario
+            // Nota: La puntuación ya incluye el multiplicador del deporte
             const puntosASumar = puntuacionEquipo.puntuacion
             console.log(`🎖️ Usuario ${userId} (equipo ${equipoUsuario}): +${puntosASumar} puntos (empate)`)
             await this.sumarPuntosCompetitivos(userId, puntosASumar)
@@ -239,41 +265,46 @@ class PuntuacionService {
       } else {
         // No hay empate, determinar equipo ganador y perdedor
         const equiposPuntuaciones = new Map<number, number>()
-        
+
         // Crear mapa de equipos y sus puntuaciones
         for (const puntuacion of puntuaciones) {
           equiposPuntuaciones.set(puntuacion.equipo, puntuacion.puntuacion)
         }
-        
+
         // Ordenar equipos por puntuación (de mayor a menor)
-        const equiposOrdenados = Array.from(equiposPuntuaciones.entries())
-          .sort((a, b) => b[1] - a[1])
-        
+        const equiposOrdenados = Array.from(equiposPuntuaciones.entries()).sort((a, b) => b[1] - a[1])
+
         console.log(`📊 Equipos ordenados por puntuación:`, equiposOrdenados)
-        
+
         // Procesar cada usuario según su equipo
         for (const usuarioQuedada of quedada.usuarioquedada) {
           const userId = usuarioQuedada.usuario.id
           const equipoUsuario = usuarioQuedada.equipo
-          
+
           // Buscar la puntuación del equipo del usuario
           const puntuacionEquipo = equiposPuntuaciones.get(equipoUsuario)
-          
+
           if (puntuacionEquipo !== undefined) {
             // Verificar si el equipo del usuario es el que tiene mayor puntuación
             if (equipoUsuario === equiposOrdenados[0][0]) {
               // Equipo ganador: sumar puntos
-              console.log(`🏅 Usuario ${userId} (equipo ${equipoUsuario}): +${puntuacionEquipo} puntos (equipo ganador)`)
+              // Nota: La puntuación ya incluye el multiplicador del deporte
+              console.log(
+                `🏅 Usuario ${userId} (equipo ${equipoUsuario}): +${puntuacionEquipo} puntos (equipo ganador)`,
+              )
               await this.sumarPuntosCompetitivos(userId, puntuacionEquipo)
             } else {
               // Equipo perdedor: restar puntos
-              console.log(`📉 Usuario ${userId} (equipo ${equipoUsuario}): -${puntuacionEquipo} puntos (equipo perdedor)`)
+              // Nota: La puntuación ya incluye el multiplicador del deporte
+              console.log(
+                `📉 Usuario ${userId} (equipo ${equipoUsuario}): -${puntuacionEquipo} puntos (equipo perdedor)`,
+              )
               await this.restarPuntosCompetitivos(userId, puntuacionEquipo)
             }
           }
         }
       }
-      
+
       console.log(`✅ Actualización de puntuación competitiva por resultado completada`)
       return true
     } catch (error) {
@@ -281,7 +312,7 @@ class PuntuacionService {
       return false
     }
   }
-  
+
   /**
    * Verifica si hay empate entre las puntuaciones
    * @param puntuaciones Lista de puntuaciones
@@ -291,9 +322,9 @@ class PuntuacionService {
     if (puntuaciones.length <= 1) {
       return true
     }
-    
+
     const primeraPuntuacion = puntuaciones[0].puntuacion
-    return puntuaciones.every(p => p.puntuacion === primeraPuntuacion)
+    return puntuaciones.every((p) => p.puntuacion === primeraPuntuacion)
   }
 }
 

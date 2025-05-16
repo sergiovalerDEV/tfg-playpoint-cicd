@@ -32,20 +32,11 @@ import UserService from "../../services/User/UserService"
 import EstablishmentsList from "../../components/EstablishmentsList"
 import SportsList from "../../components/SportsList"
 import MeetingCard from "../../components/MeetingCard"
-import AdCard from "../../components/AdCard"
-import AdService, { type Ad } from "../../services/AdService"
 import { useTheme } from "../../contexts/ThemeContext"
 import MainPageHeader from "../../components/headers/MainPageHeader"
 import SearchMeetingsHeader from "../../components/headers/SearchMeetingsHeader"
 
 type Props = StackScreenProps<RootParamList, "SearchMeetings">
-
-// Tipo para los elementos que se mostrarán en la lista
-type ListItem = {
-  id: string
-  type: "meeting" | "ad"
-  data: Quedada | Ad
-}
 
 const SearchMeetings: React.FC<Props> = ({ navigation }) => {
   // Obtener contexto de tema
@@ -85,107 +76,16 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
 
   // Data states
   const [meetings, setMeetings] = useState<Quedada[]>([])
-  const [ads, setAds] = useState<Ad[]>([])
-  const [listItems, setListItems] = useState<ListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [establishments, setEstablishments] = useState<Local[]>([])
   const [sports, setSports] = useState<Deporte[]>([])
-  const [isPremium, setIsPremium] = useState<boolean>(false)
 
   // Estado para controlar si la app está lista para renderizar
   const [appIsReady, setAppIsReady] = useState(false)
 
   // Ref para evitar múltiples actualizaciones simultáneas
   const isUpdatingRef = useRef(false)
-
-  // Cargar el estado premium del usuario
-  useEffect(() => {
-    const loadUserPremiumStatus = async () => {
-      try {
-        const user = await UserService.getCurrentUser()
-        if (user) {
-          setIsPremium(user.premium || false)
-          console.log(`Usuario premium: ${user.premium ? "Sí" : "No"}`)
-        }
-      } catch (error) {
-        console.error("Error al cargar estado premium:", error)
-        setIsPremium(false)
-      }
-    }
-
-    loadUserPremiumStatus()
-  }, [])
-
-  // Cargar anuncios si el usuario no es premium
-  useEffect(() => {
-    const loadAds = async () => {
-      if (!isPremium) {
-        try {
-          // Obtener anuncios aleatorios (aproximadamente 1 por cada 3 quedadas)
-          const adCount = Math.max(1, Math.floor(meetings.length / 3))
-          const randomAds = await AdService.getRandomAds(adCount)
-          setAds(randomAds)
-          console.log(`Cargados ${randomAds.length} anuncios para usuario no premium`)
-        } catch (error) {
-          console.error("Error al cargar anuncios:", error)
-        }
-      } else {
-        // Si el usuario es premium, limpiar los anuncios
-        setAds([])
-      }
-    }
-
-    loadAds()
-  }, [isPremium, meetings.length])
-
-  // Combinar quedadas y anuncios en una sola lista para mostrar
-  useEffect(() => {
-    const combineItemsForList = () => {
-      if (isPremium || ads.length === 0) {
-        // Si es usuario premium o no hay anuncios, mostrar solo las quedadas
-        const meetingItems: ListItem[] = meetings.map((meeting) => ({
-          id: `meeting-${meeting.id}`,
-          type: "meeting",
-          data: meeting,
-        }))
-        setListItems(meetingItems)
-        return
-      }
-
-      // Para usuarios no premium, intercalar anuncios entre las quedadas
-      const combined: ListItem[] = []
-      const adInterval = Math.max(2, Math.floor(meetings.length / ads.length))
-
-      meetings.forEach((meeting, index) => {
-        // Añadir la quedada
-        combined.push({
-          id: `meeting-${meeting.id}`,
-          type: "meeting",
-          data: meeting,
-        })
-
-        // Añadir un anuncio cada cierto número de quedadas
-        const adIndex = Math.floor(index / adInterval)
-        if ((index + 1) % adInterval === 0 && adIndex < ads.length) {
-          combined.push({
-            id: `ad-${ads[adIndex].id}-${index}`,
-            type: "ad",
-            data: ads[adIndex],
-          })
-        }
-      })
-
-      setListItems(combined)
-    }
-
-    combineItemsForList()
-  }, [meetings, ads, isPremium])
-
-  // Función para manejar el cierre de un anuncio
-  const handleCloseAd = (adId: string) => {
-    setListItems((prevItems) => prevItems.filter((item) => item.id !== adId))
-  }
 
   // Función para obtener las quedadas con los filtros aplicados
   const fetchMeetingsWithFilters = useCallback(
@@ -357,32 +257,37 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     ],
   )
 
+  // Filter meetings to show only those that are not closed and have a start date from today onwards
+  // Eliminar la función filterActiveMeetings completamente.
+
   // Helper functions for MeetingCard since they were removed from the service
   const getSportIcon = (sportName: string): string => {
     if (!sportName) return "fitness-outline"
 
     const sportName_lower = sportName.toLowerCase()
 
-    if (sportName_lower.includes("tenis") || sportName_lower.includes("padel")) {
+    if (sportName_lower.includes("tennis") || sportName_lower.includes("tenis") || sportName_lower.includes("padel")) {
       return "tennisball-outline"
-    } else if (sportName_lower.includes("futbol") || sportName_lower.includes("fútbol")) {
+    } else if (
+      sportName_lower.includes("futbol") ||
+      sportName_lower.includes("fútbol") ||
+      sportName_lower.includes("soccer")
+    ) {
       return "football-outline"
     } else if (sportName_lower.includes("basket") || sportName_lower.includes("baloncesto")) {
       return "basketball-outline"
-    } else if (sportName_lower.includes("volei") || sportName_lower.includes("volley")) {
+    } else if (sportName_lower.includes("volley") || sportName_lower.includes("voleibol")) {
       return "baseball-outline"
-    } else if (sportName_lower.includes("natación") || sportName_lower.includes("swim")) {
+    } else if (sportName_lower.includes("swim") || sportName_lower.includes("natación")) {
       return "water-outline"
-    } else if (sportName_lower.includes("running") || sportName_lower.includes("correr")) {
+    } else if (sportName_lower.includes("run") || sportName_lower.includes("correr")) {
       return "walk-outline"
-    } else if (sportName_lower.includes("cicli") || sportName_lower.includes("bici")) {
+    } else if (
+      sportName_lower.includes("cycling") ||
+      sportName_lower.includes("ciclismo") ||
+      sportName_lower.includes("bici")
+    ) {
       return "bicycle-outline"
-    } else if (sportName_lower.includes("golf")) {
-      return "golf-outline"
-    } else if (sportName_lower.includes("rugby")) {
-      return "american-football-outline"
-    } else if (sportName_lower.includes("hockey")) {
-      return "hockey-sticks"
     }
 
     return "fitness-outline" // Icono de deporte por defecto
@@ -799,34 +704,31 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     return <View style={isDark ? styles.containerDark : styles.container} />
   }
 
-  // Reemplazar la función getSportImageUrl para que use las imágenes de la base de datos
   const getSportImageUrl = (deporte: any): string => {
     // Si el deporte tiene una imagen definida en la base de datos, usarla
     if (deporte && deporte.imagen) {
       return deporte.imagen
     }
 
-    // Imagen genérica para deportes si no hay imagen en la base de datos
-    return "https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=1000"
-  }
+    // Seleccionar imagen según el deporte
+    if (deporte && deporte.nombre) {
+      const sportName = deporte.nombre.toLowerCase()
 
-  // Renderizar elemento de la lista (quedada o anuncio)
-  const renderListItem = ({ item }: { item: ListItem }) => {
-    if (item.type === "ad") {
-      return <AdCard ad={item.data as Ad} onClose={() => handleCloseAd(item.id)} />
-    } else {
-      return (
-        <MeetingCard
-          meeting={item.data as Quedada}
-          onPress={() => handleMeetingPress((item.data as Quedada).id)}
-          formatDateForDisplay={SearchMeetingsService.formatDateForDisplay}
-          formatTimeForDisplay={SearchMeetingsService.formatTimeForDisplay}
-          getSportIcon={getSportIcon}
-          getSportImageUrl={getSportImageUrl}
-          theme={theme}
-        />
-      )
+      if (sportName.includes("tenis") || sportName.includes("padel")) {
+        return "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1000"
+      } else if (sportName.includes("baloncesto") || sportName.includes("basket")) {
+        return "https://images.unsplash.com/photo-1546519638-68e109498ffc?q=80&w=1000"
+      } else if (sportName.includes("fútbol") || sportName.includes("futbol")) {
+        return "https://images.unsplash.com/photo-1599586120429-48281b6f0ece?q=80&w=1000"
+      } else if (sportName.includes("voleibol") || sportName.includes("voley")) {
+        return "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?q=80&w=1000"
+      } else if (sportName.includes("natación") || sportName.includes("swim")) {
+        return "https://images.unsplash.com/photo-1560090995-01632a28895b?q=80&w=1000"
+      }
     }
+
+    // Imagen genérica para deportes
+    return "https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=1000"
   }
 
   return (
@@ -845,7 +747,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
           <TextInput
             style={isDark ? styles.searchInputDark : styles.searchInput}
-            placeholder="Search meetings"
+            placeholder="Buscar Quedadas"
             placeholderTextColor={isDark ? "#8A8A8A" : "#BDBBC7"}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -858,7 +760,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
 
         {/* Filters Header with Toggle Button */}
         <View style={styles.filtersHeader}>
-          <Text style={isDark ? styles.sectionTitleDark : styles.sectionTitle}>Filters</Text>
+          <Text style={isDark ? styles.sectionTitleDark : styles.sectionTitle}>Filtros</Text>
           <TouchableOpacity
             onPress={toggleFilters}
             style={isDark ? styles.filterToggleButtonDark : styles.filterToggleButton}
@@ -875,7 +777,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
               <View style={styles.filterInputWrapper}>
                 <TextInput
                   style={isDark ? styles.filterInputDark : styles.filterInput}
-                  placeholder="Location"
+                  placeholder="Localización"
                   placeholderTextColor={isDark ? "#8A8A8A" : "#BDBBC7"}
                   value={location}
                   onChangeText={setLocation}
@@ -916,7 +818,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
                           : styles.filterPlaceholder
                     }
                   >
-                    {selectedEstablishment?.nombre || "Establishment"}
+                    {selectedEstablishment?.nombre || "Establecimiento"}
                   </Text>
                   {!selectedEstablishment && (
                     <Ionicons name="chevron-down" size={16} color={isDark ? "#8A8A8A" : "#BDBBC7"} as any />
@@ -949,7 +851,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
                           : styles.filterPlaceholder
                     }
                   >
-                    {formattedDate || "Date"}
+                    {formattedDate || "Fecha"}
                   </Text>
                   {!formattedDate && (
                     <Ionicons name="calendar-outline" size={16} color={isDark ? "#8A8A8A" : "#BDBBC7"} as any />
@@ -996,7 +898,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
                           : styles.filterPlaceholder
                     }
                   >
-                    {formattedStartTime || "Start time"}
+                    {formattedStartTime || "Hora De Inicio"}
                   </Text>
                   {!formattedStartTime && (
                     <Ionicons name="time-outline" size={16} color={isDark ? "#8A8A8A" : "#BDBBC7"} as any />
@@ -1029,7 +931,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
                           : styles.filterPlaceholder
                     }
                   >
-                    {formattedEndTime || "End time"}
+                    {formattedEndTime || "Hora de Fin"}
                   </Text>
                   {!formattedEndTime && (
                     <Ionicons name="time-outline" size={16} color={isDark ? "#8A8A8A" : "#BDBBC7"} as any />
@@ -1045,7 +947,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
 
             {/* Competitive Toggle */}
             <View style={isDark ? styles.competitiveRowDark : styles.competitiveRow}>
-              <Text style={isDark ? styles.competitiveTextDark : styles.competitiveText}>Competitive meeting</Text>
+              <Text style={isDark ? styles.competitiveTextDark : styles.competitiveText}>Competitividad</Text>
               <View style={styles.competitiveToggleContainer}>
                 <Switch
                   trackColor={{ false: isDark ? "#555" : "#D9D9D9", true: isDark ? "#2E7D32" : "#006400" }}
@@ -1063,7 +965,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
                 style={[isDark ? styles.resetButtonDark : styles.resetButton, { flex: 1 }]}
                 onPress={resetFilters}
               >
-                <Text style={isDark ? styles.resetButtonTextDark : styles.resetButtonText}>Reset All</Text>
+                <Text style={isDark ? styles.resetButtonTextDark : styles.resetButtonText}>Reiniciar Filtros</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1076,19 +978,22 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
         contentContainerStyle={styles.scrollableContentContainer}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={() => (
-          <View style={styles.listHeaderContainer}>
-            <Text style={isDark ? styles.sectionTitleDark : styles.sectionTitle}>Available Meetings</Text>
-            {!isPremium && (
-              <View style={styles.premiumBadgeContainer}>
-                <Text style={styles.premiumBadgeText}>Free Account</Text>
-              </View>
-            )}
-          </View>
+          <Text style={isDark ? styles.sectionTitleDark : styles.sectionTitle}>Quedadas Disponibles</Text>
         )}
-        data={listItems}
-        keyExtractor={(item) => item.id}
-        extraData={listItems.length} // Añadir esto para que la lista se actualice cuando cambie el número de elementos
-        renderItem={renderListItem}
+        data={meetings}
+        keyExtractor={(item) => item.id.toString()}
+        extraData={meetings.length} // Añadir esto para que la lista se actualice cuando cambie el número de quedadas
+        renderItem={({ item: meeting }) => (
+          <MeetingCard
+            meeting={meeting as any}
+            onPress={handleMeetingPress}
+            formatDateForDisplay={SearchMeetingsService.formatDateForDisplay}
+            formatTimeForDisplay={SearchMeetingsService.formatTimeForDisplay}
+            getSportIcon={getSportIcon}
+            getSportImageUrl={getSportImageUrl}
+            theme={theme}
+          />
+        )}
         ListEmptyComponent={
           !loading && !error ? (
             <View style={isDark ? styles.emptyContainerDark : styles.emptyContainer}>
@@ -1280,56 +1185,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 1.5,
   },
-  competitiveRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 5,
-    backgroundColor: "#F5F5F5",
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  competitiveRowDark: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 5,
-    backgroundColor: "#2A2A2A",
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  competitiveText: {
-    fontSize: 14,
-    fontFamily: "Inter-Medium",
-    color: "#333",
-  },
-  competitiveTextDark: {
-    fontSize: 14,
-    fontFamily: "Inter-Medium",
-    color: "#E0E0E0",
-  },
-  competitiveToggleContainer: {
-    marginLeft: 10,
-  },
   filtersContainer: {
-    marginBottom: 16,
-    padding: 16,
-    backgroundColor: "#F5F5F5",
-    borderRadius: 8,
+    marginBottom: 24,
   },
   filterRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 10,
+    gap: 10,
   },
   filterInputWrapper: {
     flex: 1,
-    marginRight: 8,
-    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
   },
   filterInput: {
+    flex: 1,
     height: 40,
     backgroundColor: "#EFF1F5",
     borderRadius: 8,
@@ -1339,6 +1209,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   filterInputDark: {
+    flex: 1,
     height: 40,
     backgroundColor: "#2A2A2A",
     borderRadius: 8,
@@ -1346,70 +1217,71 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Regular",
     fontSize: 14,
     color: "#E0E0E0",
+  },
+  clearInputButton: {
+    position: "absolute",
+    right: 8,
+    padding: 4,
   },
   filterDropdown: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flex: 1,
     height: 40,
     backgroundColor: "#EFF1F5",
     borderRadius: 8,
     paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   filterDropdownDark: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flex: 1,
     height: 40,
     backgroundColor: "#2A2A2A",
     borderRadius: 8,
     paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   filterDate: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flex: 1,
     height: 40,
     backgroundColor: "#EFF1F5",
     borderRadius: 8,
     paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   filterDateDark: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flex: 1,
     height: 40,
     backgroundColor: "#2A2A2A",
     borderRadius: 8,
     paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   filterTime: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flex: 1,
     height: 40,
     backgroundColor: "#EFF1F5",
     borderRadius: 8,
     paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   filterTimeDark: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flex: 1,
     height: 40,
     backgroundColor: "#2A2A2A",
     borderRadius: 8,
     paddingHorizontal: 12,
-  },
-  filterText: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    color: "#333",
-  },
-  filterTextDark: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    color: "#E0E0E0",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   filterPlaceholder: {
     fontFamily: "Inter-Regular",
@@ -1421,111 +1293,188 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#8A8A8A",
   },
-  clearInputButton: {
-    position: "absolute",
-    right: 10,
-    top: 12,
+  filterText: {
+    fontFamily: "Inter-Regular",
+    fontSize: 14,
+    color: "#333",
+  },
+  filterTextDark: {
+    fontFamily: "Inter-Regular",
+    fontSize: 14,
+    color: "#E0E0E0",
+  },
+  competitiveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  competitiveRowDark: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  competitiveText: {
+    fontFamily: "Inter-Regular",
+    fontSize: 14,
+    color: "#333",
+  },
+  competitiveTextDark: {
+    fontFamily: "Inter-Regular",
+    fontSize: 14,
+    color: "#E0E0E0",
+  },
+  competitiveToggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  clearCompetitiveButton: {
+    marginLeft: 8,
   },
   filterActions: {
     flexDirection: "row",
     justifyContent: "space-between",
+    marginTop: 16,
+    gap: 10,
   },
   resetButton: {
-    backgroundColor: "#EFF1F5",
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderColor: "#006400",
     borderRadius: 8,
-    paddingVertical: 10,
+    justifyContent: "center",
     alignItems: "center",
   },
   resetButtonDark: {
-    backgroundColor: "#2A2A2A",
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderColor: "#2E7D32",
     borderRadius: 8,
-    paddingVertical: 10,
+    justifyContent: "center",
     alignItems: "center",
   },
   resetButtonText: {
     fontFamily: "Inter-Medium",
     fontSize: 14,
-    color: "#333",
+    color: "#006400",
   },
   resetButtonTextDark: {
     fontFamily: "Inter-Medium",
     fontSize: 14,
-    color: "#E0E0E0",
+    color: "#4CAF50",
   },
   scrollableContent: {
     flex: 1,
+    paddingHorizontal: 16,
   },
   scrollableContentContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingTop: 8,
   },
-  listHeaderContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  loadingContainer: {
+    padding: 20,
     alignItems: "center",
-    marginBottom: 12,
   },
-  listHeader: {
-    marginBottom: 12,
+  loadingContainerDark: {
+    padding: 20,
+    alignItems: "center",
   },
-  premiumPrompt: {
-    fontSize: 12,
+  loadingText: {
     fontFamily: "Inter-Regular",
-    color: "#777",
+    fontSize: 14,
+    color: "#666",
+    marginTop: 8,
   },
-  premiumPromptDark: {
-    fontSize: 12,
+  loadingTextDark: {
     fontFamily: "Inter-Regular",
-    color: "#999",
+    fontSize: 14,
+    color: "#AAA",
+    marginTop: 8,
+  },
+  errorContainer: {
+    padding: 20,
+    alignItems: "center",
+    backgroundColor: "#FFEBEE",
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorContainerDark: {
+    padding: 20,
+    alignItems: "center",
+    backgroundColor: "#331A1A",
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontFamily: "Inter-Regular",
+    fontSize: 14,
+    color: "#D32F2F",
+    marginTop: 8,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  errorTextDark: {
+    fontFamily: "Inter-Regular",
+    fontSize: 14,
+    color: "#FF5252",
+    marginTop: 8,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  retryButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: "#D32F2F",
+    borderRadius: 8,
+  },
+  retryButtonDark: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: "#C62828",
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontFamily: "Inter-Medium",
+    fontSize: 14,
+    color: "#FFFFFF",
   },
   emptyContainer: {
-    flex: 1,
+    padding: 40,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 40,
   },
   emptyContainerDark: {
-    flex: 1,
+    padding: 40,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 40,
   },
   emptyText: {
-    fontSize: 16,
     fontFamily: "Inter-Medium",
-    color: "#777",
+    fontSize: 16,
+    color: "#666",
     marginTop: 16,
   },
   emptyTextDark: {
-    fontSize: 16,
     fontFamily: "Inter-Medium",
-    color: "#999",
+    fontSize: 16,
+    color: "#AAA",
     marginTop: 16,
   },
   emptySubtext: {
-    fontSize: 14,
     fontFamily: "Inter-Regular",
-    color: "#777",
+    fontSize: 14,
+    color: "#999",
     marginTop: 8,
     textAlign: "center",
   },
   emptySubtextDark: {
-    fontSize: 14,
     fontFamily: "Inter-Regular",
-    color: "#999",
+    fontSize: 14,
+    color: "#777",
     marginTop: 8,
     textAlign: "center",
-  },
-  premiumBadgeContainer: {
-    backgroundColor: "#FFC107",
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  premiumBadgeText: {
-    fontSize: 12,
-    fontFamily: "Inter-SemiBold",
-    color: "#212121",
   },
 })
 

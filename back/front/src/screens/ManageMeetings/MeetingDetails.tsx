@@ -41,41 +41,41 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
   const { theme } = useTheme?.() || { theme: "light" }
   const isDark = theme === "dark"
 
-  // Definir colores base para mantener consistencia
+  // Definir colores base para mantener consistencia con el resto de la aplicación
   const colors = {
-    // Colores claros para modo claro
+    // Colores para modo claro
     light: {
-      primary: "#4CAF50", // Verde principal
-      secondary: "#8BC34A", // Verde secundario
+      primary: "#006400", // Verde principal más oscuro (como en otras pantallas)
+      secondary: "#4CAF50", // Verde secundario
       background: "#FFFFFF", // Fondo blanco
       card: "#F5F9F5", // Fondo de tarjeta (verde muy claro)
       border: "#E8F5E9", // Borde (verde muy claro)
-      text: "#2E7D32", // Texto principal (verde oscuro)
-      textSecondary: "#689F38", // Texto secundario (verde medio)
-      textLight: "#AED581", // Texto claro (verde claro)
-      buttonPrimary: "#4CAF50", // Botón principal
-      buttonSecondary: "#8BC34A", // Botón secundario
+      text: "#006400", // Texto principal (verde oscuro)
+      textSecondary: "#4CAF50", // Texto secundario (verde medio)
+      textLight: "#8BC34A", // Texto claro (verde claro)
+      buttonPrimary: "#006400", // Botón principal
+      buttonSecondary: "#4CAF50", // Botón secundario
       buttonDisabled: "#C8E6C9", // Botón deshabilitado
       statusActive: "#4CAF50", // Estado activo
-      statusInactive: "#AED581", // Estado inactivo
-      statusClosed: "#81C784", // Estado cerrado
+      statusInactive: "#8BC34A", // Estado inactivo
+      statusClosed: "#006400", // Estado cerrado
     },
-    // Colores para modo oscuro (manteniendo tonos verdes claros)
+    // Colores para modo oscuro
     dark: {
-      primary: "#81C784", // Verde principal más claro
-      secondary: "#A5D6A7", // Verde secundario más claro
-      background: "#F5F9F5", // Fondo verde muy claro
-      card: "#E8F5E9", // Fondo de tarjeta (verde muy claro)
-      border: "#C8E6C9", // Borde (verde claro)
-      text: "#2E7D32", // Texto principal (verde oscuro)
-      textSecondary: "#388E3C", // Texto secundario (verde medio)
-      textLight: "#66BB6A", // Texto claro (verde)
+      primary: "#4CAF50", // Verde principal más claro para modo oscuro
+      secondary: "#8BC34A", // Verde secundario
+      background: "#121212", // Fondo oscuro
+      card: "#1E1E1E", // Fondo de tarjeta oscuro
+      border: "#2C2C2C", // Borde oscuro
+      text: "#4CAF50", // Texto principal (verde)
+      textSecondary: "#8BC34A", // Texto secundario (verde claro)
+      textLight: "#A5D6A7", // Texto claro (verde muy claro)
       buttonPrimary: "#4CAF50", // Botón principal
       buttonSecondary: "#8BC34A", // Botón secundario
-      buttonDisabled: "#C8E6C9", // Botón deshabilitado
+      buttonDisabled: "#2E7D32", // Botón deshabilitado
       statusActive: "#4CAF50", // Estado activo
-      statusInactive: "#AED581", // Estado inactivo
-      statusClosed: "#81C784", // Estado cerrado
+      statusInactive: "#8BC34A", // Estado inactivo
+      statusClosed: "#2E7D32", // Estado cerrado
     },
   }
 
@@ -641,7 +641,7 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
     }
   }
 
-  // Leave meeting - FUNCIÓN CORREGIDA
+  // Leave meeting
   const handleLeaveMeeting = async () => {
     if (!meeting) return
 
@@ -843,7 +843,7 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: currentColors.background }}>
-        <StatusBar barStyle="dark-content" backgroundColor={currentColors.background} />
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={currentColors.background} />
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
           <ActivityIndicator size="large" color={currentColors.primary} />
           <Text
@@ -864,7 +864,7 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
   if (error || !meeting) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: currentColors.background }}>
-        <StatusBar barStyle="dark-content" backgroundColor={currentColors.background} />
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={currentColors.background} />
         <View style={{ flexDirection: "row", alignItems: "center", padding: 16 }}>
           <TouchableOpacity style={{ padding: 4 }} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={currentColors.text} as any />
@@ -934,12 +934,12 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: currentColors.background }}>
-      <StatusBar barStyle="dark-content" backgroundColor={currentColors.background} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={currentColors.background} />
 
       {/* Header with meeting name */}
       <SecondaryPageHeader
         text={meeting.nombre || `${meeting.deporte?.nombre || "Sport"} en ${meeting.localizacion || "Location"}`}
-        isDark={false} // Siempre usar modo claro para mantener la estética minimalista
+        isDark={isDark}
       />
 
       {/* Header Image with Overlay */}
@@ -947,7 +947,6 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
         <View
           style={{
             flex: 1,
-            backgroundColor: "rgba(255,255,255,0.6)", // Overlay más claro y sutil
             justifyContent: "space-between",
             position: "relative",
           }}
@@ -1453,7 +1452,7 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
                   <View
                     style={{
                       height: 6,
-                      backgroundColor: "#F5F5F5",
+                      backgroundColor: isDark ? "#2C2C2C" : "#F5F5F5",
                       borderRadius: 3,
                       overflow: "hidden",
                       marginBottom: 12,
@@ -1490,7 +1489,7 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
                               width: 28,
                               height: 28,
                               borderRadius: 14,
-                              backgroundColor: "#F5F5F5",
+                              backgroundColor: isDark ? "#2C2C2C" : "#F5F5F5",
                               justifyContent: "center",
                               alignItems: "center",
                               marginRight: 8,
@@ -1628,7 +1627,7 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
                     ) : (
                       <View
                         style={{
-                          backgroundColor: "#FFFFFF",
+                          backgroundColor: isDark ? "#2C2C2C" : "#FFFFFF",
                           borderRadius: 8,
                           paddingVertical: 8,
                           paddingHorizontal: 12,
@@ -1747,7 +1746,7 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
                       width: 36,
                       height: 36,
                       borderRadius: 18,
-                      backgroundColor: "#F5F5F5",
+                      backgroundColor: isDark ? "#2C2C2C" : "#F5F5F5",
                       justifyContent: "center",
                       alignItems: "center",
                       marginRight: 12,
@@ -1769,7 +1768,7 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
                   </Text>
                   <View
                     style={{
-                      backgroundColor: "rgba(76,175,80,0.1)",
+                      backgroundColor: "rgba(0,100,0,0.1)",
                       paddingVertical: 2,
                       paddingHorizontal: 6,
                       borderRadius: 4,
@@ -1800,7 +1799,7 @@ const MeetingDetails: React.FC<Props> = ({ navigation, route }) => {
         onClose={handleCloseReportModal}
         onSubmit={handleSubmitReport}
         title={`Reportar: ${meeting.nombre || "Quedada"}`}
-        theme="light" // Siempre usar modo claro para mantener la estética minimalista
+        theme={isDark ? "dark" : "light"}
       />
     </SafeAreaView>
   )

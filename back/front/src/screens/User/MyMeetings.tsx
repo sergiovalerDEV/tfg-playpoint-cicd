@@ -655,6 +655,40 @@ const MyMeetings: React.FC<Props> = ({ navigation }) => {
     return "https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=1000"
   }
 
+  // Función para obtener el icono del deporte
+  const getSportIcon = (sportName: string): string => {
+    if (!sportName) return "basketball-outline"
+
+    const name = sportName.toLowerCase()
+
+    if (name.includes("fútbol") || name.includes("futbol") || name.includes("soccer")) {
+      return "football-outline"
+    } else if (name.includes("baloncesto") || name.includes("basket") || name.includes("basketball")) {
+      return "basketball-outline"
+    } else if (name.includes("tenis") || name.includes("tennis")) {
+      return "tennisball-outline"
+    } else if (name.includes("voleibol") || name.includes("voley") || name.includes("volleyball")) {
+      return "american-football-outline"
+    } else if (name.includes("natación") || name.includes("swim") || name.includes("swimming")) {
+      return "water-outline"
+    } else if (name.includes("ciclismo") || name.includes("cycling") || name.includes("bicicleta")) {
+      return "bicycle-outline"
+    } else if (name.includes("running") || name.includes("correr") || name.includes("atletismo")) {
+      return "walk-outline"
+    } else if (name.includes("golf")) {
+      return "golf-outline"
+    } else if (name.includes("hockey")) {
+      return "baseball-outline"
+    } else if (name.includes("rugby")) {
+      return "american-football-outline"
+    } else if (name.includes("padel") || name.includes("paddle")) {
+      return "tennisball-outline"
+    }
+
+    // Icono por defecto para otros deportes
+    return "basketball-outline"
+  }
+
   // Renderizar contenido según la pestaña activa
   const renderContent = () => {
     const meetings = activeTab === "joined" ? joinedMeetings : createdMeetings
@@ -740,7 +774,7 @@ const MyMeetings: React.FC<Props> = ({ navigation }) => {
                 onPress={() => navigateToMeetingDetails(meeting.id)}
                 formatDateForDisplay={MyMeetingsService.formatDate}
                 formatTimeForDisplay={MyMeetingsService.formatTime}
-                getSportIcon={MyMeetingsService.getSportIcon}
+                getSportIcon={getSportIcon}
                 getSportImageUrl={getSportImageUrl}
                 theme={theme}
               />
@@ -754,7 +788,7 @@ const MyMeetings: React.FC<Props> = ({ navigation }) => {
                   onPress={() => navigateToMeetingDetails(meeting.id)}
                   formatDateForDisplay={MyMeetingsService.formatDate}
                   formatTimeForDisplay={MyMeetingsService.formatTime}
-                  getSportIcon={MyMeetingsService.getSportIcon}
+                  getSportIcon={getSportIcon}
                   getSportImageUrl={getSportImageUrl}
                   theme={theme}
                 />

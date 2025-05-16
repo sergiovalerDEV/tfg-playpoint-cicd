@@ -52,6 +52,8 @@ const PuntuarEquiposScreen: React.FC<Props> = ({ navigation, route }) => {
   const [equipos, setEquipos] = useState<EquipoConPuntuacion[]>([])
   const [puntuacionesModificadas, setPuntuacionesModificadas] = useState<boolean>(false)
   const [esCompetitiva, setEsCompetitiva] = useState<boolean>(false)
+  // Nuevo estado para el multiplicador del deporte
+  const [multiplicadorDeporte, setMultiplicadorDeporte] = useState<number>(1)
 
   // Cargar fuentes
   const [fontsLoaded] = useFonts({
@@ -97,6 +99,11 @@ const PuntuarEquiposScreen: React.FC<Props> = ({ navigation, route }) => {
         setEsCompetitiva(quedada.competitividad === true)
         console.log(`ℹ️ La quedada ${quedadaId} es competitiva: ${quedada.competitividad === true}`)
 
+        // Obtener el multiplicador del deporte
+        const multiplicador = quedada.deporte?.multiplicador_puntuacion_competitiva || 1
+        setMultiplicadorDeporte(multiplicador)
+        console.log(`ℹ️ Multiplicador del deporte: ${multiplicador}`)
+
         // Obtener puntuaciones existentes
         const puntuacionesExistentes = await PuntuacionService.getPuntuacionesByQuedadaId(quedadaId)
 
@@ -119,10 +126,19 @@ const PuntuarEquiposScreen: React.FC<Props> = ({ navigation, route }) => {
           // Buscar si ya tiene puntuación
           const puntuacionExistente = puntuacionesExistentes.find((p) => p.equipo === i)
 
+          // Si tiene puntuación, mostrar la puntuación original (antes de aplicar el multiplicador)
+          let puntuacionOriginal = 5 // Valor por defecto
+          if (puntuacionExistente) {
+            // Calcular la puntuación original dividiendo por el multiplicador
+            puntuacionOriginal = Math.round((puntuacionExistente.puntuacion / multiplicador) * 10) / 10
+            // Asegurar que esté en el rango 1-10
+            puntuacionOriginal = Math.max(1, Math.min(10, Math.round(puntuacionOriginal)))
+          }
+
           equiposData.push({
             id: i,
             nombre: `Equipo ${i}`,
-            puntuacion: puntuacionExistente ? puntuacionExistente.puntuacion : 5, // Valor por defecto
+            puntuacion: puntuacionExistente ? puntuacionOriginal : 5, // Valor por defecto o puntuación original
             tienePuntuacion: !!puntuacionExistente,
             jugadores: jugadores,
           })
@@ -169,6 +185,7 @@ const PuntuarEquiposScreen: React.FC<Props> = ({ navigation, route }) => {
           `📊 Guardando puntuación ${equipo.puntuacion} para equipo ${equipo.id} con ${equipo.jugadores.length} jugadores`,
         )
 
+        // Aquí se aplica el multiplicador al guardar la puntuación
         const resultado = await PuntuacionService.anadirPuntuacion(quedadaId, equipo.id, equipo.puntuacion)
 
         if (!resultado) {
@@ -359,6 +376,12 @@ const PuntuarEquiposScreen: React.FC<Props> = ({ navigation, route }) => {
                   jugadores.
                 </Text>
               )}
+              {/* Mostrar información sobre el multiplicador si es diferente de 1 */}
+              {multiplicadorDeporte !== 1 && esCompetitiva && (
+                <Text style={[styles.instructionsText, isDark && styles.instructionsTextDark, styles.competitiveNote]}>
+                  Este deporte tiene un multiplicador de puntuación de x{multiplicadorDeporte}.
+                </Text>
+              )}
               <Text style={[styles.instructionsText, styles.instructionsNote, isDark && styles.instructionsTextDark]}>
                 Nota: Una vez asignada, la puntuación no se puede modificar.
               </Text>
@@ -420,6 +443,9 @@ const PuntuarEquiposScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Ionicons name="star" size={20} color={isDark ? "#FFD700" : "#FFC107"} as any />
                   <Text style={[styles.puntuacionResultadoText, isDark && styles.puntuacionResultadoTextDark]}>
                     Este equipo ha sido puntuado con {equipo.puntuacion} {equipo.puntuacion === 1 ? "punto" : "puntos"}
+                    {multiplicadorDeporte !== 1 && esCompetitiva
+                      ? ` (x${multiplicadorDeporte} = ${Math.round(equipo.puntuacion * multiplicadorDeporte * 10) / 10} puntos competitivos)`
+                      : ""}
                   </Text>
                 </View>
               )}
