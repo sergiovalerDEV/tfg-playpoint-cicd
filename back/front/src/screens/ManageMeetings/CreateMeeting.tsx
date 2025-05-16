@@ -49,6 +49,7 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
   const [meetingName, setMeetingName] = useState("")
   const [location, setLocation] = useState("")
   const [isCompetitive, setIsCompetitive] = useState(false)
+  const [competitiveScore, setCompetitiveScore] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
 
@@ -88,6 +89,7 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
     setMeetingName("")
     setLocation("")
     setIsCompetitive(false)
+    setCompetitiveScore("")
     setSelectedDay(null)
     setSelectedMonth(null)
     setSelectedYear(null)
@@ -298,6 +300,13 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
     setFormattedEndTime(formattedTime)
   }
 
+  // Función para validar que la puntuación competitiva sea un número
+  const validateCompetitiveScore = (text: string) => {
+    // Permitir solo números
+    const numericValue = text.replace(/[^0-9]/g, "")
+    setCompetitiveScore(numericValue)
+  }
+
   // Función para crear la quedada
   const handleCreateMeeting = async () => {
     // Validar campos requeridos
@@ -333,6 +342,12 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
 
     if (!location.trim()) {
       showAlert("Por favor introduce una ubicación", "error")
+      return
+    }
+
+    // Validar puntuación competitiva si la quedada es competitiva
+    if (isCompetitive && !competitiveScore) {
+      showAlert("Por favor introduce una puntuación competitiva objetiva", "error")
       return
     }
 
@@ -373,7 +388,8 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
       console.log("Creando quedada con usuario:", currentUser.id)
       console.log("Competitividad (booleano):", isCompetitive)
 
-      const createdMeeting = await CreateMeetingService.createMeeting({
+      // Crear objeto con los parámetros para la API
+      const meetingParams: any = {
         nombre: meetingName.trim(),
         creador: currentUser.id,
         localizacion: location.trim(),
@@ -383,7 +399,14 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
         competitividad: isCompetitive,
         local: selectedEstablishment.id,
         deporte: selectedSport.id,
-      })
+      }
+
+      // Añadir puntuación competitiva objetiva solo si la quedada es competitiva
+      if (isCompetitive && competitiveScore) {
+        meetingParams.puntuacion_competitiva_objetiva = Number.parseInt(competitiveScore, 10)
+      }
+
+      const createdMeeting = await CreateMeetingService.createMeeting(meetingParams)
 
       // Resetear el formulario después de crear la quedada exitosamente
       resetForm()
@@ -433,7 +456,6 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
         <MainPageHeader text="Crear Quedada" isDark={isDark}></MainPageHeader>
 
         <ScrollView style={isDark ? styles.contentDark : styles.content} showsVerticalScrollIndicator={false}>
-
           {/* Nombre de la Quedada */}
           <View style={isDark ? styles.formGroupDark : styles.formGroup}>
             <Text style={isDark ? styles.labelDark : styles.label}>Nombre de la Quedada</Text>
@@ -598,11 +620,33 @@ const CreateMeeting: React.FC<Props> = ({ navigation }) => {
               ios_backgroundColor={isDark ? "#555" : "#D9D9D9"}
               onValueChange={(value) => {
                 setIsCompetitive(value)
-                console.log("Toggle cambiado a:", value, "Se enviará como:", value ? 1 : 0)
+                if (!value) {
+                  setCompetitiveScore("")
+                }
+                console.log("Toggle cambiado a:", value)
               }}
               value={isCompetitive}
             />
           </View>
+
+          {/* Campo de Puntuación Competitiva Objetiva - Solo visible si isCompetitive es true */}
+          {isCompetitive && (
+            <View style={isDark ? styles.formGroupDark : styles.formGroup}>
+              <Text style={isDark ? styles.labelDark : styles.label}>Puntuación Competitiva Objetiva</Text>
+              <TextInput
+                style={isDark ? styles.inputDark : styles.input}
+                placeholder="Introduce la puntuación competitiva (0-1000)"
+                placeholderTextColor={isDark ? "#8A8A8A" : "#BDBBC7"}
+                value={competitiveScore}
+                onChangeText={validateCompetitiveScore}
+                keyboardType="numeric"
+                maxLength={4}
+              />
+              <Text style={isDark ? styles.helperTextDark : styles.helperText}>
+                Define el nivel de habilidad requerido para esta quedada (0-1000)
+              </Text>
+            </View>
+          )}
 
           {/* Botones de acción */}
           <View style={isDark ? styles.buttonRowDark : styles.buttonRow}>
@@ -758,6 +802,18 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Regular",
     fontSize: 14,
     color: "#E0E0E0",
+  },
+  helperText: {
+    fontSize: 12,
+    fontFamily: "Inter-Regular",
+    color: "#666666",
+    marginTop: 4,
+  },
+  helperTextDark: {
+    fontSize: 12,
+    fontFamily: "Inter-Regular",
+    color: "#AAAAAA",
+    marginTop: 4,
   },
   dropdown: {
     height: 40,

@@ -52,6 +52,7 @@ export interface Quedada {
   hora_inicio: string
   hora_finalizacion: string
   competitividad: boolean
+  puntuacion_competitiva_objetiva?: number
   local: Local
   deporte: Deporte
   abierta: boolean
@@ -71,6 +72,7 @@ export interface FilterParams {
   hora_actual?: string
   hora_desde_hoy?: string
   competitividad?: boolean
+  puntuacion_competitiva_objetiva?: number
   local?: number | string
   deporte?: number | string
   usuarioquedada?: number[]
@@ -141,8 +143,27 @@ class SearchMeetingsService {
     { id: "no_asistencia", label: "No asistencia a la quedada" },
     { id: "informacion_falsa", label: "Información falsa en la descripción" },
     { id: "incumplimiento_normas", label: "Incumplimiento de las normas" },
-    { id: "contenido_inapropiado", label: "Contenido inapropiado" }
+    { id: "contenido_inapropiado", label: "Contenido inapropiado" },
   ]
+
+  // Rango de puntuación competitiva para filtrado por similitud
+  _competitivePointsRange = 100
+
+  /**
+   * Establece el rango de puntuación competitiva para filtrado por similitud
+   * @param range Rango de puntos (por defecto 100)
+   */
+  setCompetitivePointsRange(range: number): void {
+    this._competitivePointsRange = range
+    console.log(`Rango de puntuación competitiva establecido a: ${range}`)
+  }
+
+  /**
+   * Obtiene el rango de puntuación competitiva actual
+   */
+  getCompetitivePointsRange(): number {
+    return this._competitivePointsRange
+  }
 
   /**
    * SOLUCIÓN DEFINITIVA: Método para obtener una instancia autenticada de axios
@@ -718,6 +739,61 @@ class SearchMeetingsService {
   }
 
   /**
+   * Filtra quedadas por cercanía en puntuación competitiva
+   * @param userCompetitivePoints Puntuación competitiva del usuario
+   * @returns Quedadas filtradas por cercanía en puntuación competitiva
+   */
+  async filterMeetingsByCompetitiveRange(userCompetitivePoints: number): Promise<Quedada[]> {
+    try {
+      console.log(
+        `🔍 Filtrando quedadas por cercanía en puntuación competitiva: ${userCompetitivePoints} ± ${this._competitivePointsRange}`,
+      )
+
+      // Usar el método getAuthenticatedAxios para obtener una instancia autenticada
+      const api = await this.getAuthenticatedAxios()
+
+      // Crear filtros para la API
+      const filters = {
+        abierta: true,
+        competitividad: true, // Solo quedadas competitivas
+        puntuacion_competitiva_objetiva: userCompetitivePoints,
+        // El backend ya maneja el rango internamente (±100 por defecto)
+      }
+
+      console.log(`🔍 Enviando filtros al servidor: ${JSON.stringify(filters)}`)
+
+      // Llamar al endpoint de filtrado
+      const response = await api.post("/quedada/filtrar", filters)
+
+      // Verificar que la respuesta sea un array
+      if (Array.isArray(response.data)) {
+        console.log(`✅ Obtenidas ${response.data.length} quedadas con puntuación competitiva similar`)
+
+        // Filtrar solo quedadas dentro del rango de puntos
+        const now = new Date()
+        const filteredData = response.data.filter((meeting) => {
+          // Verificar que la quedada sea futura
+          const meetingDate = new Date(meeting.fecha)
+          const [hours, minutes] = meeting.hora_inicio.split(":").map(Number)
+          meetingDate.setHours(hours, minutes, 0, 0)
+
+          // Solo devolver quedadas futuras
+          return meetingDate >= now
+        })
+
+        console.log(`✅ Después de filtrar por fecha: ${filteredData.length} quedadas dentro del rango de puntos`)
+        return filteredData
+      }
+
+      console.log("❌ La respuesta de filtrado por puntuación competitiva no es un array")
+      return []
+    } catch (error) {
+      console.error("❌ Error al filtrar quedadas por puntuación competitiva:", error)
+      return []
+    }
+  }
+
+  /**
    * Verifica si el usuario actual está unido a una quedada
    */
   async isUserJoinedToMeeting(quedadaId: number): Promise<boolean> {
@@ -1262,16 +1338,16 @@ class SearchMeetingsService {
   async getReportReasons(): Promise<ReportReason[]> {
     try {
       console.log("🔍 Obteniendo razones de reporte estáticas")
-      
+
       // Devolver razones estáticas en lugar de consultar la base de datos
-      return this.STATIC_REPORT_REASONS;
+      return this.STATIC_REPORT_REASONS
     } catch (error) {
       console.error("❌ Error al obtener razones de reporte:", error)
-      
+
       // En caso de error, devolver un conjunto básico de razones
       return [
         { id: "comportamiento_inadecuado", label: "Comportamiento inadecuado" },
-        { id: "otro", label: "Otro motivo" }
+        { id: "otro", label: "Otro motivo" },
       ]
     }
   }

@@ -57,20 +57,21 @@ export class QuedadaService {
   }
 
   async crear(parametros) {
-    const quedada =  new Quedada;
-    quedada.creador = parametros.creador;
-    quedada.nombre = parametros.nombre;
-    quedada.localizacion = parametros.localizacion;
-    quedada.fecha = parametros.fecha;
-    quedada.hora_inicio = parametros.hora_inicio;
-    quedada.hora_finalizacion = parametros.hora_finalizacion;
-    quedada.competitividad = parametros.competitividad;
-    quedada.local =parametros.local;
-    quedada.deporte = parametros.deporte;
-    quedada.abierta = true
+  const quedada = new Quedada;
+  quedada.creador = parametros.creador;
+  quedada.nombre = parametros.nombre;
+  quedada.localizacion = parametros.localizacion;
+  quedada.fecha = parametros.fecha;
+  quedada.hora_inicio = parametros.hora_inicio;
+  quedada.hora_finalizacion = parametros.hora_finalizacion;
+  quedada.competitividad = parametros.competitividad;
+  quedada.puntuacion_competitiva_objetiva = parametros.puntuacion_competitiva_objetiva;
+  quedada.local = parametros.local;
+  quedada.deporte = parametros.deporte;
+  quedada.abierta = true
 
-    return (await this.quedadaRepository.insert(quedada)).raw[0];
-  }
+  return (await this.quedadaRepository.insert(quedada)).raw[0];
+}
 
   async cerrarQuedada(id: number) {
     const quedada = await this.quedadaRepository.findOne({ where: { id } });

@@ -1,6 +1,5 @@
 import UserService from "../User/UserService"
 import axios from "axios"
-import SearchMeetingsService from "./SearchMeetingsService"
 
 // Define tipos para mejor seguridad
 export interface CreateMeetingParams {
@@ -11,6 +10,7 @@ export interface CreateMeetingParams {
   hora_inicio: string // Formato HH:MM:SS
   hora_finalizacion: string // Formato HH:MM:SS
   competitividad: boolean // Cambiado de number a boolean para enviar el valor correcto
+  puntuacion_competitiva_objetiva?: number // Nuevo campo para puntuación competitiva objetiva
   local: number // ID del establecimiento
   deporte: number // ID del deporte
 }
@@ -57,7 +57,6 @@ const CreateMeetingService = {
       } catch (apiError) {
         console.error("Error al obtener establecimientos de la API:", apiError)
         console.log("Usando datos estáticos para establecimientos")
-        
       }
     } catch (error) {
       console.error("Error general al obtener establecimientos:", error)
@@ -100,24 +99,24 @@ const CreateMeetingService = {
   async joinMeetingAutomatically(userId: number, quedadaId: number): Promise<boolean> {
     try {
       console.log(`Inscribiendo automáticamente al usuario ${userId} en la quedada ${quedadaId}`)
-      
+
       const api = await UserService.getAuthenticatedAxios()
-      
+
       // Parámetros para unirse a la quedada
       // Por defecto, asignamos al equipo 1
       const joinParams = {
         usuario: userId,
         quedada: quedadaId,
-        equipo: 1
+        equipo: 1,
       }
-      
+
       console.log("Parámetros para unirse:", joinParams)
-      
+
       // Llamar al endpoint /usuarioquedada/unirse
       const response = await api.post("/usuarioquedada/unirse", joinParams)
-      
+
       console.log("Respuesta de unirse a quedada:", response.data)
-      
+
       return true
     } catch (error) {
       console.error("Error al inscribir automáticamente al usuario:", error)
@@ -160,7 +159,7 @@ const CreateMeetingService = {
           // Guardar el ID del usuario y de la quedada para la inscripción
           const userId = params.creador
           const quedadaId = response.data.id
-          
+
           console.log(`Inscribiendo automáticamente al usuario ${userId} en la quedada ${quedadaId}`)
 
           // Intentar unirse a la quedada usando el nuevo método

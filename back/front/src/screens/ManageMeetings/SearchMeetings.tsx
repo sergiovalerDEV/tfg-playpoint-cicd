@@ -35,6 +35,7 @@ import MeetingCard from "../../components/MeetingCard"
 import { useTheme } from "../../contexts/ThemeContext"
 import MainPageHeader from "../../components/headers/MainPageHeader"
 import SearchMeetingsHeader from "../../components/headers/SearchMeetingsHeader"
+import CompetitiveRangeFilter from "../../components/CompetitiveRangeFilter"
 
 type Props = StackScreenProps<RootParamList, "SearchMeetings">
 
@@ -43,7 +44,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
   const { theme } = useTheme()
   const isDark = theme === "dark"
 
-  // Search and filter states
+  // Estados de búsqueda y filtros
   const [searchQuery, setSearchQuery] = useState("")
   const [location, setLocation] = useState("")
   const [selectedEstablishment, setSelectedEstablishment] = useState<Local | null>(null)
@@ -51,13 +52,17 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
   const [isCompetitive, setIsCompetitive] = useState<boolean | undefined>(undefined)
   const [filtersVisible, setFiltersVisible] = useState(false)
 
-  // Date states
+  // Estado para el filtro de cercanía en competitividad
+  const [useCompetitiveRangeFilter, setUseCompetitiveRangeFilter] = useState(false)
+  const [userCompetitivePoints, setUserCompetitivePoints] = useState<number | null>(null)
+
+  // Estados de fecha
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const [formattedDate, setFormattedDate] = useState("")
 
-  // Time states
+  // Estados de hora
   const [startHour, setStartHour] = useState<number | null>(null)
   const [startMinute, setStartMinute] = useState<number | null>(null)
   const [startAmPm, setStartAmPm] = useState<string | null>(null)
@@ -68,13 +73,13 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
   const [endAmPm, setEndAmPm] = useState<string | null>(null)
   const [formattedEndTime, setFormattedEndTime] = useState("")
 
-  // Modal visibility states
+  // Estados de visibilidad de modales
   const [showDateModal, setShowDateModal] = useState(false)
   const [showStartTimeModal, setShowStartTimeModal] = useState(false)
   const [showEndTimeModal, setShowEndTimeModal] = useState(false)
   const [showEstablishmentDropdown, setShowEstablishmentDropdown] = useState(false)
 
-  // Data states
+  // Estados de datos
   const [meetings, setMeetings] = useState<Quedada[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -87,9 +92,15 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
   // Ref para evitar múltiples actualizaciones simultáneas
   const isUpdatingRef = useRef(false)
 
+  // Ref para controlar el tiempo entre actualizaciones (debounce)
+  const updateTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Ref para controlar si es la carga inicial
+  const isInitialLoadRef = useRef(true)
+
   // Función para obtener las quedadas con los filtros aplicados
   const fetchMeetingsWithFilters = useCallback(
-    async (silentUpdate = false) => {
+    async (silentUpdate = false, forceLoading = false) => {
       // Evitar múltiples actualizaciones simultáneas
       if (isUpdatingRef.current) {
         console.log("Ya hay una actualización en curso, ignorando esta solicitud")
@@ -98,13 +109,34 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
 
       isUpdatingRef.current = true
 
-      // Solo mostrar indicador de carga si no es una actualización silenciosa
-      if (!silentUpdate) {
+      // Solo mostrar indicador de carga si no es una actualización silenciosa o si se fuerza
+      if ((!silentUpdate || forceLoading) && !isInitialLoadRef.current) {
         setLoading(true)
       }
+
       setError(null)
 
       try {
+        // Si el filtro de rango competitivo está activo, usar el método específico
+        if (useCompetitiveRangeFilter && userCompetitivePoints !== null) {
+          console.log(`🔍 Usando filtro específico de rango competitivo: ${userCompetitivePoints} puntos`)
+          const data = await SearchMeetingsService.filterMeetingsByCompetitiveRange(userCompetitivePoints)
+          console.log(`✅ Obtenidas ${data.length} quedadas con puntuación competitiva similar`)
+          setMeetings(data)
+
+          // Extraer establecimientos y deportes únicos si los endpoints de API no están disponibles
+          if (data.length > 0 && (sports.length === 0 || establishments.length === 0)) {
+            extractEstablishmentsAndSports(data)
+          }
+
+          // Finalizar y permitir nuevas actualizaciones
+          if (!silentUpdate || forceLoading) {
+            setLoading(false)
+          }
+          isUpdatingRef.current = false
+          return
+        }
+
         // Construir objeto de filtros para enviar al servidor
         const filters: FilterParams = {}
 
@@ -208,27 +240,30 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
 
         setMeetings(filteredData)
 
-        // Extract unique establishments and sports if API endpoints are not available
+        // Extraer establecimientos y deportes únicos si los endpoints de API no están disponibles
         if (filteredData.length > 0 && (sports.length === 0 || establishments.length === 0)) {
           extractEstablishmentsAndSports(filteredData)
         }
       } catch (error) {
-        console.error("Error fetching meetings:", error)
+        console.error("Error al obtener quedadas:", error)
         if (error instanceof Error) {
           setError(error.message)
         } else {
-          setError("Failed to load meetings. Please try again.")
+          setError("Error al cargar quedadas. Por favor, inténtalo de nuevo.")
         }
 
-        // Check if it's an authentication error
+        // Comprobar si es un error de autenticación
         if (error instanceof Error && error.message.includes("session has expired")) {
           Alert.alert("Sesión expirada", "Tu sesión ha expirado. Por favor, loguéate de nuevo.", [
             { text: "OK", onPress: () => navigation.navigate("Login") },
           ])
         }
       } finally {
-        // Solo cambiar el estado de carga si no es una actualización silenciosa
-        if (!silentUpdate) {
+        // Marcar que ya no es la carga inicial
+        isInitialLoadRef.current = false
+
+        // Solo cambiar el estado de carga si no es una actualización silenciosa o si se fuerza
+        if (!silentUpdate || forceLoading) {
           setLoading(false)
         }
 
@@ -242,6 +277,8 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
       selectedEstablishment,
       selectedSport,
       isCompetitive,
+      useCompetitiveRangeFilter,
+      userCompetitivePoints,
       selectedDay,
       selectedMonth,
       selectedYear,
@@ -257,10 +294,56 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     ],
   )
 
-  // Filter meetings to show only those that are not closed and have a start date from today onwards
-  // Eliminar la función filterActiveMeetings completamente.
+  // Función para aplicar debounce a las actualizaciones
+  const debouncedFetchMeetings = useCallback(
+    (silentUpdate = true) => {
+      // Cancelar cualquier temporizador existente
+      if (updateTimerRef.current) {
+        clearTimeout(updateTimerRef.current)
+      }
 
-  // Helper functions for MeetingCard since they were removed from the service
+      // Crear un nuevo temporizador
+      updateTimerRef.current = setTimeout(() => {
+        fetchMeetingsWithFilters(silentUpdate)
+      }, 500) // Esperar 500ms antes de actualizar
+    },
+    [fetchMeetingsWithFilters],
+  )
+
+  // Cargar la puntuación competitiva del usuario al inicio
+  useEffect(() => {
+    const loadUserCompetitivePoints = async () => {
+      try {
+        const user = await UserService.getCurrentUser()
+        if (user && user.puntuacion_competitiva !== undefined) {
+          console.log(`Puntuación competitiva del usuario cargada: ${user.puntuacion_competitiva}`)
+          setUserCompetitivePoints(user.puntuacion_competitiva)
+        } else {
+          // Si no se encuentra en caché, intentar obtenerla de la base de datos
+          const points = await UserService.getCompetitivePointsFromDB()
+          console.log(`Puntuación competitiva obtenida de la BD: ${points}`)
+          setUserCompetitivePoints(points)
+        }
+      } catch (error) {
+        console.error("Error al cargar puntuación competitiva:", error)
+        setUserCompetitivePoints(0) // Valor por defecto en caso de error
+      }
+    }
+
+    loadUserCompetitivePoints()
+  }, [])
+
+  // Función para alternar el filtro de cercanía en competitividad
+  const toggleCompetitiveRangeFilter = useCallback(() => {
+    setUseCompetitiveRangeFilter((prev) => {
+      const newValue = !prev
+      // Si se activa o desactiva el filtro, actualizar con debounce
+      debouncedFetchMeetings(true)
+      return newValue
+    })
+  }, [debouncedFetchMeetings])
+
+  // Funciones auxiliares para MeetingCard ya que se eliminaron del servicio
   const getSportIcon = (sportName: string): string => {
     if (!sportName) return "fitness-outline"
 
@@ -293,17 +376,18 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     return "fitness-outline" // Icono de deporte por defecto
   }
 
-  // Replace the checkForPastMeetings function with a stub that does nothing
+  // Reemplazar la función checkForPastMeetings con un stub que no hace nada
   const checkForPastMeetings = useCallback(async () => {
-    // This function is now a stub that does nothing
-    // We're keeping it to maintain compatibility with existing code
+    // Esta función ahora es un stub que no hace nada
+    // La mantenemos para mantener la compatibilidad con el código existente
     console.log("Verificación de quedadas pasadas desactivada según nuevos requisitos")
 
     // En su lugar, refrescamos la lista para aplicar los filtros de fecha y hora
-    fetchMeetingsWithFilters(true)
-  }, [fetchMeetingsWithFilters])
+    // Usar siempre silentUpdate=true para evitar mostrar el indicador de carga
+    debouncedFetchMeetings(true)
+  }, [debouncedFetchMeetings])
 
-  // Replace with a simple effect that logs the change
+  // Reemplazar con un efecto simple que registra el cambio
   // Configurar un intervalo para verificar periódicamente si hay quedadas que ya han pasado
   useEffect(() => {
     console.log("Configurando verificación periódica de quedadas pasadas")
@@ -320,7 +404,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     }
   }, [checkForPastMeetings])
 
-  // Load Inter font
+  // Cargar fuente Inter
   const [fontsLoaded] = useFonts({
     "Inter-Regular": require("../../assets/Inter_18pt-Regular.ttf"),
     "Inter-Medium": require("../../assets/Inter_18pt-Medium.ttf"),
@@ -407,35 +491,37 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
         SplashScreen.hideAsync().catch((e) => console.warn("Error al ocultar splash en cambio de estado:", e))
 
         // También refrescar las quedadas para asegurarnos de que no se muestran quedadas pasadas
-        checkForPastMeetings()
+        // Usar siempre silentUpdate=true para evitar mostrar el indicador de carga
+        debouncedFetchMeetings(true)
       }
     })
 
     return () => {
       subscription.remove()
     }
-  }, [checkForPastMeetings])
+  }, [debouncedFetchMeetings])
 
-  // Check authentication and load meetings on component mount
+  // Verificar autenticación y cargar quedadas al montar el componente
   useEffect(() => {
     const checkAuthAndLoadMeetings = async () => {
       try {
-        // Check if user is logged in using UserService
+        // Comprobar si el usuario está logueado usando UserService
         const isLoggedIn = await UserService.isLoggedIn()
         if (!isLoggedIn) {
-          // Redirect to login if not authenticated
+          // Redirigir al login si no está autenticado
           navigation.navigate("Login")
           return
         }
 
-        // Load all meetings with empty filters (get all)
-        await fetchMeetingsWithFilters()
+        // Cargar todas las quedadas con filtros vacíos (obtener todas)
+        // Esta es la carga inicial, así que mostramos el indicador de carga
+        await fetchMeetingsWithFilters(false)
 
-        // Load sports and establishments from API
+        // Cargar deportes y establecimientos desde la API
         await loadSportsAndEstablishments()
       } catch (error) {
-        console.error("Error in initial load:", error)
-        setError("Failed to load meetings. Please try again.")
+        console.error("Error en la carga inicial:", error)
+        setError("Error al cargar quedadas. Por favor, inténtalo de nuevo.")
         setLoading(false)
       }
     }
@@ -443,11 +529,11 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     checkAuthAndLoadMeetings()
   }, [navigation, fetchMeetingsWithFilters])
 
-  // Extract unique establishments and sports from meetings
+  // Extraer establecimientos y deportes únicos de las quedadas
   const extractEstablishmentsAndSports = (data: Quedada[]) => {
     if (data.length === 0) return
 
-    // Extract unique establishments
+    // Extraer establecimientos únicos
     const uniqueEstablishments: Local[] = []
     const establishmentIds = new Set()
 
@@ -458,7 +544,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
       }
     })
 
-    // Extract unique sports
+    // Extraer deportes únicos
     const uniqueSports: Deporte[] = []
     const sportIds = new Set()
 
@@ -469,7 +555,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
       }
     })
 
-    // Only set if we don't already have data from API
+    // Solo establecer si aún no tenemos datos de la API
     if (establishments.length === 0) {
       setEstablishments(uniqueEstablishments)
     }
@@ -479,43 +565,39 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     }
   }
 
-  // Load sports and establishments from API
+  // Cargar deportes y establecimientos desde la API
   const loadSportsAndEstablishments = async () => {
     try {
-      // Load sports from API
+      // Cargar deportes desde la API
       const sportsData = await SearchMeetingsService.getAllSports()
       if (sportsData && sportsData.length > 0) {
         setSports(sportsData)
       }
 
-      // Load establishments from API
+      // Cargar establecimientos desde la API
       const establishmentsData = await SearchMeetingsService.getAllEstablishments()
       if (establishmentsData && establishmentsData.length > 0) {
         setEstablishments(establishmentsData)
       }
     } catch (error) {
-      console.error("Error loading sports and establishments:", error)
+      console.error("Error al cargar deportes y establecimientos:", error)
     }
   }
 
-  // Handle search button click
+  // Manejar clic en el botón de búsqueda
   const handleSearch = useCallback(async () => {
     // Usar el método fetchMeetingsWithFilters que ya incluye el searchQuery
-    await fetchMeetingsWithFilters()
+    // Forzar mostrar el indicador de carga ya que es una acción explícita del usuario
+    await fetchMeetingsWithFilters(false, true)
   }, [fetchMeetingsWithFilters])
 
   // Añadir un efecto para realizar búsqueda automática cuando cambia el texto
   useEffect(() => {
-    // Usar un temporizador para evitar demasiadas búsquedas mientras se escribe
-    const searchTimer = setTimeout(() => {
-      // Realizar búsqueda con los filtros actuales
-      fetchMeetingsWithFilters(false)
-    }, 500) // Esperar 500ms después de que el usuario deje de escribir
+    // Usar debounce para evitar demasiadas búsquedas mientras se escribe
+    debouncedFetchMeetings(true)
+  }, [searchQuery, debouncedFetchMeetings])
 
-    return () => clearTimeout(searchTimer)
-  }, [searchQuery, fetchMeetingsWithFilters])
-
-  // Apply filters
+  // Aplicar filtros
   const applyFilters = () => {
     console.log("🔍 FILTRADO: Iniciando aplicación de filtros...")
 
@@ -529,13 +611,16 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
       console.log(`🔍 FILTRADO: Establecimiento: "${selectedEstablishment.nombre}" (ID: ${selectedEstablishment.id})`)
     if (selectedSport) console.log(`🔍 FILTRADO: Deporte: "${selectedSport.nombre}" (ID: ${selectedSport.id})`)
     if (isCompetitive !== undefined) console.log(`🔍 FILTRADO: Competitivo: ${isCompetitive ? "Sí" : "No"}`)
+    if (useCompetitiveRangeFilter)
+      console.log(`🔍 FILTRADO: Usando filtro de cercanía en competitividad: ${userCompetitivePoints} puntos`)
 
     // Usar el método fetchMeetingsWithFilters que ya incluye todos los filtros
-    fetchMeetingsWithFilters()
+    // Forzar mostrar el indicador de carga ya que es una acción explícita del usuario
+    fetchMeetingsWithFilters(false, true)
     setFiltersVisible(false)
   }
 
-  // Reset filters
+  // Resetear filtros
   const resetFilters = () => {
     // Resetear todos los estados de filtro
     setSearchQuery("")
@@ -543,20 +628,21 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     setSelectedEstablishment(null)
     setSelectedSport(null)
     setIsCompetitive(undefined)
+    setUseCompetitiveRangeFilter(false)
 
-    // Reset date
+    // Resetear fecha
     setSelectedDay(null)
     setSelectedMonth(null)
     setSelectedYear(null)
     setFormattedDate("")
 
-    // Reset start time
+    // Resetear hora de inicio
     setStartHour(null)
     setStartMinute(null)
     setStartAmPm(null)
     setFormattedStartTime("")
 
-    // Reset end time
+    // Resetear hora de fin
     setEndHour(null)
     setEndMinute(null)
     setEndAmPm(null)
@@ -565,20 +651,21 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     console.log("Filtros reseteados, obteniendo todas las quedadas")
 
     // Obtener todas las quedadas sin filtros
-    fetchMeetingsWithFilters()
+    // Forzar mostrar el indicador de carga ya que es una acción explícita del usuario
+    fetchMeetingsWithFilters(false, true)
   }
 
   // Funciones para resetear filtros individuales
   const resetLocation = () => {
     setLocation("")
-    // Fetch meetings after clearing the filter
-    fetchMeetingsWithFilters()
+    // Obtener quedadas después de limpiar el filtro
+    debouncedFetchMeetings(true)
   }
 
   const resetEstablishment = () => {
     setSelectedEstablishment(null)
-    // Fetch meetings after clearing the filter
-    fetchMeetingsWithFilters()
+    // Obtener quedadas después de limpiar el filtro
+    debouncedFetchMeetings(true)
   }
 
   const resetDate = () => {
@@ -586,8 +673,8 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     setSelectedMonth(null)
     setSelectedYear(null)
     setFormattedDate("")
-    // Fetch meetings after clearing the filter
-    fetchMeetingsWithFilters()
+    // Obtener quedadas después de limpiar el filtro
+    debouncedFetchMeetings(true)
   }
 
   const resetStartTime = () => {
@@ -595,8 +682,8 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     setStartMinute(null)
     setStartAmPm(null)
     setFormattedStartTime("")
-    // Fetch meetings after clearing the filter
-    fetchMeetingsWithFilters()
+    // Obtener quedadas después de limpiar el filtro
+    debouncedFetchMeetings(true)
   }
 
   const resetEndTime = () => {
@@ -604,24 +691,31 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     setEndMinute(null)
     setEndAmPm(null)
     setFormattedEndTime("")
-    // Fetch meetings after clearing the filter
-    fetchMeetingsWithFilters()
+    // Obtener quedadas después de limpiar el filtro
+    debouncedFetchMeetings(true)
   }
 
   const resetSport = () => {
     setSelectedSport(null)
-    // Fetch meetings after clearing the filter
-    fetchMeetingsWithFilters()
+    // Obtener quedadas después de limpiar el filtro
+    debouncedFetchMeetings(true)
   }
 
   const resetCompetitive = () => {
     setIsCompetitive(undefined)
-    // Fetch meetings after clearing the filter
-    fetchMeetingsWithFilters()
+    // Obtener quedadas después de limpiar el filtro
+    debouncedFetchMeetings(true)
   }
 
   // Toggle competitive switch
-  const toggleSwitch = () => setIsCompetitive((previousState) => (previousState === undefined ? true : !previousState))
+  const toggleSwitch = () => {
+    setIsCompetitive((previousState) => {
+      const newState = previousState === undefined ? true : !previousState
+      // Actualizar con debounce
+      setTimeout(() => debouncedFetchMeetings(true), 0)
+      return newState
+    })
+  }
 
   // Toggle filters visibility
   const toggleFilters = () => setFiltersVisible((previousState) => !previousState)
@@ -661,6 +755,9 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     // Format the date for display
     const formattedDate = `${day.toString().padStart(2, "0")}/${(month + 1).toString().padStart(2, "0")}/${year}`
     setFormattedDate(formattedDate)
+
+    // Actualizar con debounce
+    debouncedFetchMeetings(true)
   }
 
   // Handle time selection
@@ -672,6 +769,9 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     // Format the time for display
     const formattedTime = `${hour}:${minute.toString().padStart(2, "0")}${ampm.toLowerCase()}`
     setFormattedStartTime(formattedTime)
+
+    // Actualizar con debounce
+    debouncedFetchMeetings(true)
   }
 
   const handleEndTimeSelection = (hour: number, minute: number, ampm: string) => {
@@ -682,12 +782,16 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
     // Format the time for display
     const formattedTime = `${hour}:${minute.toString().padStart(2, "0")}${ampm.toLowerCase()}`
     setFormattedEndTime(formattedTime)
+
+    // Actualizar con debounce
+    debouncedFetchMeetings(true)
   }
 
   // CAMBIO 1: Función para refrescar manualmente las quedadas
   const handleManualRefresh = async () => {
     console.log("Refrescando manualmente las quedadas...")
-    await fetchMeetingsWithFilters(false) // Forzar recarga con indicador de carga
+    // Forzar mostrar el indicador de carga ya que es una acción explícita del usuario
+    await fetchMeetingsWithFilters(false, true)
   }
 
   // Función para manejar la navegación a los detalles de la quedada
@@ -758,6 +862,14 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
           />
         </View>
 
+        {/* Competitive Range Filter - Always visible */}
+        <CompetitiveRangeFilter
+          isEnabled={useCompetitiveRangeFilter}
+          onToggle={toggleCompetitiveRangeFilter}
+          userCompetitivePoints={userCompetitivePoints}
+          isDark={isDark}
+        />
+
         {/* Filters Header with Toggle Button */}
         <View style={styles.filtersHeader}>
           <Text style={isDark ? styles.sectionTitleDark : styles.sectionTitle}>Filtros</Text>
@@ -794,7 +906,11 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
             <SportsList
               sports={sports}
               selectedSport={selectedSport}
-              onSelectSport={(sport) => setSelectedSport(sport as Deporte | null)}
+              onSelectSport={(sport) => {
+                setSelectedSport(sport as Deporte | null)
+                // Actualizar con debounce
+                setTimeout(() => debouncedFetchMeetings(true), 0)
+              }}
               getSportIcon={getSportIcon}
               theme={theme}
             />
@@ -870,7 +986,12 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
               <EstablishmentsList
                 establishments={establishments}
                 selectedEstablishment={selectedEstablishment}
-                onSelectEstablishment={setSelectedEstablishment}
+                onSelectEstablishment={(establishment) => {
+                  setSelectedEstablishment(establishment)
+                  setShowEstablishmentDropdown(false)
+                  // Actualizar con debounce
+                  setTimeout(() => debouncedFetchMeetings(true), 0)
+                }}
                 onClose={() => setShowEstablishmentDropdown(false)}
                 theme={theme} // Pasar el tema actual
               />
@@ -998,9 +1119,9 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
           !loading && !error ? (
             <View style={isDark ? styles.emptyContainerDark : styles.emptyContainer}>
               <Ionicons name="calendar-outline" size={48} color={isDark ? "#555" : "#BDBBC7"} as any />
-              <Text style={isDark ? styles.emptyTextDark : styles.emptyText}>No meetings found</Text>
+              <Text style={isDark ? styles.emptyTextDark : styles.emptyText}>No se encontraron quedadas</Text>
               <Text style={isDark ? styles.emptySubtextDark : styles.emptySubtext}>
-                Try adjusting your filters or create a new meeting
+                Intenta ajustar tus filtros o crea una nueva quedada
               </Text>
             </View>
           ) : null
@@ -1034,7 +1155,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
         initialHour={startHour}
         initialMinute={startMinute}
         initialAmPm={startAmPm}
-        title="Select Start Time"
+        title="Seleccionar Hora de Inicio"
         theme={theme} // Pasar el tema actual
       />
 
@@ -1045,7 +1166,7 @@ const SearchMeetings: React.FC<Props> = ({ navigation }) => {
         initialHour={endHour}
         initialMinute={endMinute}
         initialAmPm={endAmPm}
-        title="Select End Time"
+        title="Seleccionar Hora de Fin"
         theme={theme} // Pasar el tema actual
       />
     </SafeAreaView>
@@ -1218,11 +1339,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#E0E0E0",
   },
-  clearInputButton: {
-    position: "absolute",
-    right: 8,
-    padding: 4,
-  },
   filterDropdown: {
     flex: 1,
     height: 40,
@@ -1283,16 +1399,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  filterPlaceholder: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    color: "#BDBBC7",
-  },
-  filterPlaceholderDark: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    color: "#8A8A8A",
-  },
   filterText: {
     fontFamily: "Inter-Regular",
     fontSize: 14,
@@ -1303,43 +1409,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#E0E0E0",
   },
+  filterPlaceholder: {
+    fontFamily: "Inter-Regular",
+    fontSize: 14,
+    color: "#BDBBC7",
+  },
+  filterPlaceholderDark: {
+    fontFamily: "Inter-Regular",
+    fontSize: 14,
+    color: "#8A8A8A",
+  },
+  clearInputButton: {
+    padding: 8,
+  },
   competitiveRow: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 6,
+    alignItems: "center",
+    marginBottom: 16,
   },
   competitiveRowDark: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 6,
+    alignItems: "center",
+    marginBottom: 16,
   },
   competitiveText: {
-    fontFamily: "Inter-Regular",
     fontSize: 14,
+    fontFamily: "Inter-Medium",
     color: "#333",
   },
   competitiveTextDark: {
-    fontFamily: "Inter-Regular",
     fontSize: 14,
+    fontFamily: "Inter-Medium",
     color: "#E0E0E0",
   },
   competitiveToggleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  clearCompetitiveButton: {
-    marginLeft: 8,
+    marginLeft: 16,
   },
   filterActions: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 16,
-    gap: 10,
   },
   resetButton: {
-    flex: 1,
     height: 40,
     borderWidth: 1,
     borderColor: "#006400",
@@ -1348,7 +1460,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   resetButtonDark: {
-    flex: 1,
     height: 40,
     borderWidth: 1,
     borderColor: "#2E7D32",
@@ -1371,108 +1482,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   scrollableContentContainer: {
-    paddingTop: 8,
-  },
-  loadingContainer: {
-    padding: 20,
-    alignItems: "center",
-  },
-  loadingContainerDark: {
-    padding: 20,
-    alignItems: "center",
-  },
-  loadingText: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    color: "#666",
-    marginTop: 8,
-  },
-  loadingTextDark: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    color: "#AAA",
-    marginTop: 8,
-  },
-  errorContainer: {
-    padding: 20,
-    alignItems: "center",
-    backgroundColor: "#FFEBEE",
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  errorContainerDark: {
-    padding: 20,
-    alignItems: "center",
-    backgroundColor: "#331A1A",
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  errorText: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    color: "#D32F2F",
-    marginTop: 8,
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  errorTextDark: {
-    fontFamily: "Inter-Regular",
-    fontSize: 14,
-    color: "#FF5252",
-    marginTop: 8,
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  retryButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: "#D32F2F",
-    borderRadius: 8,
-  },
-  retryButtonDark: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: "#C62828",
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    fontFamily: "Inter-Medium",
-    fontSize: 14,
-    color: "#FFFFFF",
+    paddingBottom: 20,
   },
   emptyContainer: {
-    padding: 40,
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 40,
   },
   emptyContainerDark: {
-    padding: 40,
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 40,
   },
   emptyText: {
-    fontFamily: "Inter-Medium",
     fontSize: 16,
-    color: "#666",
+    fontFamily: "Inter-Medium",
+    color: "#BDBBC7",
     marginTop: 16,
   },
   emptyTextDark: {
-    fontFamily: "Inter-Medium",
     fontSize: 16,
-    color: "#AAA",
+    fontFamily: "Inter-Medium",
+    color: "#555",
     marginTop: 16,
   },
   emptySubtext: {
-    fontFamily: "Inter-Regular",
     fontSize: 14,
-    color: "#999",
+    fontFamily: "Inter-Regular",
+    color: "#BDBBC7",
     marginTop: 8,
     textAlign: "center",
   },
   emptySubtextDark: {
-    fontFamily: "Inter-Regular",
     fontSize: 14,
-    color: "#777",
+    fontFamily: "Inter-Regular",
+    color: "#555",
     marginTop: 8,
     textAlign: "center",
   },

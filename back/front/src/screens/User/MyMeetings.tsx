@@ -356,6 +356,12 @@ const MyMeetings: React.FC<Props> = ({ navigation }) => {
   const navigateToPuntuarEquipos = (quedadaId: number) => {
     // Verificar si la quedada ya ha sido puntuada
     const meeting = createdMeetings.find((m) => m.id === quedadaId)
+    
+    // Verificar si la quedada tiene solo un participante
+    if (meeting && meeting.usuarioquedada && meeting.usuarioquedada.length <= 1) {
+      showInlineAlert("No se puede puntuar una quedada con un solo participante.", "warning")
+      return
+    }
 
     console.log(`🎯 Navegando a PuntuarEquipos con quedadaId: ${quedadaId}, soloLectura: ${meeting?.puntuada || false}`)
     navigation.navigate("PuntuarEquipos", {
