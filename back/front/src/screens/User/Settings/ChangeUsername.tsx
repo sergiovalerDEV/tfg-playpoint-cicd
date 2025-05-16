@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   View,
   Text,
@@ -10,20 +10,22 @@ import {
   SafeAreaView,
   StatusBar,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
 import { useFonts } from "expo-font"
 import { useTheme } from "../../../contexts/ThemeContext"
 import UserService from "../../../services/User/UserService"
 import SecondaryPageHeader from "../../../components/headers/SecondaryPageHeader"
+import { showAlert, AlertProvider } from "../../../components/Alert"
 
 type Props = {
   navigation: any
 }
 
 const ChangeUsername: React.FC<Props> = ({ navigation }) => {
+  // Ref para controlar si el componente está montado
+  const isMounted = useRef(true)
+  
   const { theme } = useTheme()
   const isDark = theme === "dark"
 
@@ -32,6 +34,13 @@ const ChangeUsername: React.FC<Props> = ({ navigation }) => {
   const [confirmUsername, setConfirmUsername] = useState("")
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
+
+  // Efecto para limpiar la referencia cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      isMounted.current = false
+    }
+  }, [])
 
   // Cargar el nombre de usuario actual
   useEffect(() => {
@@ -44,7 +53,9 @@ const ChangeUsername: React.FC<Props> = ({ navigation }) => {
       } catch (error) {
         console.error("Error al cargar el nombre de usuario:", error)
       } finally {
-        setInitialLoading(false)
+        if (isMounted.current) {
+          setInitialLoading(false)
+        }
       }
     }
 
@@ -61,23 +72,23 @@ const ChangeUsername: React.FC<Props> = ({ navigation }) => {
   const handleChangeUsername = async () => {
     // Validaciones
     if (!newUsername.trim() || !confirmUsername.trim()) {
-      Alert.alert("Error", "Por favor, completa todos los campos")
+      showAlert("Por favor, completa todos los campos", "error")
       return
     }
 
     if (newUsername !== confirmUsername) {
-      Alert.alert("Error", "Los nombres de usuario no coinciden")
+      showAlert("Los nombres de usuario no coinciden", "error")
       return
     }
 
     if (newUsername === currentUsername) {
-      Alert.alert("Error", "El nuevo nombre de usuario debe ser diferente al actual")
+      showAlert("El nuevo nombre de usuario debe ser diferente al actual", "error")
       return
     }
 
     // Validar longitud mínima
     if (newUsername.length < 3) {
-      Alert.alert("Error", "El nombre de usuario debe tener al menos 3 caracteres")
+      showAlert("El nombre de usuario debe tener al menos 3 caracteres", "error")
       return
     }
 
@@ -88,17 +99,21 @@ const ChangeUsername: React.FC<Props> = ({ navigation }) => {
       const success = await UserService.updateUsername(newUsername)
 
       if (success) {
-        Alert.alert("Éxito", "Nombre de usuario actualizado correctamente", [
-          { text: "OK", onPress: () => navigation.goBack() },
-        ])
+        showAlert("Nombre de usuario actualizado correctamente", "success", 3000, () => {
+          if (isMounted.current) {
+            navigation.goBack()
+          }
+        })
       } else {
-        Alert.alert("Error", "No se pudo actualizar el nombre de usuario. Inténtalo de nuevo.")
+        showAlert("No se pudo actualizar el nombre de usuario. Inténtalo de nuevo.", "error")
       }
     } catch (error) {
       console.error("Error al cambiar el nombre de usuario:", error)
-      Alert.alert("Error", "Ocurrió un error al actualizar el nombre de usuario. Por favor, inténtalo de nuevo.")
+      showAlert("Ocurrió un error al actualizar el nombre de usuario. Por favor, inténtalo de nuevo.", "error")
     } finally {
-      setLoading(false)
+      if (isMounted.current) {
+        setLoading(false)
+      }
     }
   }
 
@@ -111,53 +126,55 @@ const ChangeUsername: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <AlertProvider>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-      <SecondaryPageHeader text={"Cambiar Nombre de Usuario"} isDark={isDark}></SecondaryPageHeader>
+        <SecondaryPageHeader text={"Cambiar Nombre de Usuario"} isDark={isDark}></SecondaryPageHeader>
 
-      {/* Form */}
-      <View style={styles.formContainer}>
-        <View style={styles.currentInfoContainer}>
-          <Text style={styles.currentInfoLabel}>Nombre de usuario actual:</Text>
-          <Text style={styles.currentInfoValue}>{currentUsername}</Text>
+        {/* Form */}
+        <View style={styles.formContainer}>
+          <View style={styles.currentInfoContainer}>
+            <Text style={styles.currentInfoLabel}>Nombre de usuario actual:</Text>
+            <Text style={styles.currentInfoValue}>{currentUsername}</Text>
+          </View>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Ingresa nuevo nombre de usuario"
+            placeholderTextColor="#999"
+            value={newUsername}
+            onChangeText={setNewUsername}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!loading}
+          />
+
+          <TextInput
+            style={styles.input}
+            placeholder="Confirma nombre de usuario"
+            placeholderTextColor="#999"
+            value={confirmUsername}
+            onChangeText={setConfirmUsername}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!loading}
+          />
+
+          <TouchableOpacity
+            style={[styles.changeButton, loading && styles.disabledButton]}
+            onPress={handleChangeUsername}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.changeButtonText}>Cambiar</Text>
+            )}
+          </TouchableOpacity>
         </View>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Ingresa nuevo nombre de usuario"
-          placeholderTextColor="#999"
-          value={newUsername}
-          onChangeText={setNewUsername}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!loading}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Confirma nombre de usuario"
-          placeholderTextColor="#999"
-          value={confirmUsername}
-          onChangeText={setConfirmUsername}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!loading}
-        />
-
-        <TouchableOpacity
-          style={[styles.changeButton, loading && styles.disabledButton]}
-          onPress={handleChangeUsername}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.changeButtonText}>Cambiar</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </AlertProvider>
   )
 }
 

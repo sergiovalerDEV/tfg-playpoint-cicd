@@ -2,7 +2,7 @@
 
 import type { StackScreenProps } from "@react-navigation/stack"
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   View,
   Text,
@@ -12,7 +12,6 @@ import {
   StatusBar,
   SafeAreaView,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -27,6 +26,7 @@ import bcrypt from "react-native-bcrypt"
 import axios from "axios"
 import { API_URL } from "../../../config"
 import EmailVerificationModal from "../../components/modals/EmailVerificationModal"
+import { showAlert, AlertProvider } from "../../components/Alert"
 
 const NOTIFICATION_PERMISSION_KEY = "@notification_permission"
 
@@ -41,6 +41,9 @@ Notifications.setNotificationHandler({
 type Props = StackScreenProps<RootParamList, "Register">
 
 const Register: React.FC<Props> = ({ navigation }) => {
+  // Ref para controlar si el componente está montado
+  const isMounted = useRef(true)
+  
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -57,6 +60,13 @@ const Register: React.FC<Props> = ({ navigation }) => {
   const [showVerificationModal, setShowVerificationModal] = useState(false)
   const [verificationLoading, setVerificationLoading] = useState(false)
   const [verificationError, setVerificationError] = useState<string | null>(null)
+
+  // Efecto para limpiar la referencia cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      isMounted.current = false
+    }
+  }, [])
 
   const [fontsLoaded] = useFonts({
     "Inter-Regular": require("../../assets/Inter_18pt-Regular.ttf"),
@@ -148,7 +158,9 @@ const Register: React.FC<Props> = ({ navigation }) => {
       console.error("Error sending verification code:", error)
       setVerificationError("An unexpected error occurred. Please try again.")
     } finally {
-      setVerificationLoading(false)
+      if (isMounted.current) {
+        setVerificationLoading(false)
+      }
     }
   }
 
@@ -157,7 +169,7 @@ const Register: React.FC<Props> = ({ navigation }) => {
     if (enteredCode === verificationCode) {
       setIsEmailVerified(true)
       setShowVerificationModal(false)
-      Alert.alert("Éxito", "Email verificado correctamente!")
+      showAlert("Email verificado correctamente!", "success")
     } else {
       setVerificationError("Invalid verification code. Please try again.")
     }
@@ -229,7 +241,11 @@ const Register: React.FC<Props> = ({ navigation }) => {
 
       if (result.success) {
         await sendWelcomeNotification()
-        navigation.navigate("Login")
+        showAlert("Registro exitoso. Ahora puedes iniciar sesión.", "success", 2000, () => {
+          if (isMounted.current) {
+            navigation.navigate("Login")
+          }
+        })
       } else {
         setErrorMessage(result.message || "Registration failed. Please try again.")
       }
@@ -237,7 +253,9 @@ const Register: React.FC<Props> = ({ navigation }) => {
       console.error("Registration error:", error)
       setErrorMessage("An unexpected error occurred. Please try again.")
     } finally {
-      setLoading(false)
+      if (isMounted.current) {
+        setLoading(false)
+      }
     }
   }
 
@@ -250,152 +268,154 @@ const Register: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-          <View style={styles.content}>
-            <Text style={styles.registerTitle}>Register</Text>
+    <AlertProvider>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+            <View style={styles.content}>
+              <Text style={styles.registerTitle}>Register</Text>
 
-            {errorMessage ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{errorMessage}</Text>
+              {errorMessage ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your username"
+                  placeholderTextColor="#9e9e9e"
+                  value={username}
+                  onChangeText={setUsername}
+                  editable={!loading}
+                  autoCapitalize="none"
+                />
               </View>
-            ) : null}
 
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your username"
-                placeholderTextColor="#9e9e9e"
-                value={username}
-                onChangeText={setUsername}
-                editable={!loading}
-                autoCapitalize="none"
-              />
-            </View>
+              <View style={styles.emailContainer}>
+                <TextInput
+                  style={styles.emailInput}
+                  placeholder="Enter your email"
+                  placeholderTextColor="#9e9e9e"
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text)
+                    setIsEmailVerified(false) // Reset verification when email changes
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!loading && !verificationLoading}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.verifyButton,
+                    isEmailVerified && styles.verifiedButton,
+                    (loading || verificationLoading) && styles.disabledButton,
+                  ]}
+                  onPress={sendVerificationCode}
+                  disabled={loading || verificationLoading || isEmailVerified}
+                >
+                  {verificationLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : isEmailVerified ? (
+                    <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.verifyButtonText}>Verify</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
 
-            <View style={styles.emailContainer}>
-              <TextInput
-                style={styles.emailInput}
-                placeholder="Enter your email"
-                placeholderTextColor="#9e9e9e"
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text)
-                  setIsEmailVerified(false) // Reset verification when email changes
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                editable={!loading && !verificationLoading}
-              />
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter password"
+                  placeholderTextColor="#9e9e9e"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                  activeOpacity={0.7}
+                  disabled={loading}
+                >
+                  <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#9e9e9e" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Confirm password"
+                  placeholderTextColor="#9e9e9e"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  editable={!loading}
+                />
+                <TouchableOpacity 
+                  style={styles.eyeIcon} 
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)} 
+                  activeOpacity={0.7}
+                  disabled={loading}
+                >
+                  <Ionicons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#9e9e9e" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.phoneContainer}>
+                <TouchableOpacity style={styles.countryCode} disabled={loading}>
+                  <Text style={styles.countryCodeText}>+34</Text>
+                  <Ionicons name="chevron-down" size={16} color="#333" />
+                </TouchableOpacity>
+
+                <TextInput
+                  style={styles.phoneInput}
+                  placeholder="Phone Number"
+                  placeholderTextColor="#9e9e9e"
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                  keyboardType="phone-pad"
+                  editable={!loading}
+                />
+              </View>
+
               <TouchableOpacity
-                style={[
-                  styles.verifyButton,
-                  isEmailVerified && styles.verifiedButton,
-                  (loading || verificationLoading) && styles.disabledButton,
-                ]}
-                onPress={sendVerificationCode}
-                disabled={loading || verificationLoading || isEmailVerified}
-              >
-                {verificationLoading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : isEmailVerified ? (
-                  <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.verifyButtonText}>Verify</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter password"
-                placeholderTextColor="#9e9e9e"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                editable={!loading}
-              />
-              <TouchableOpacity
-                style={styles.eyeIcon}
-                onPress={() => setShowPassword(!showPassword)}
-                activeOpacity={0.7}
+                style={[styles.registerButton, loading && styles.registerButtonDisabled]}
+                activeOpacity={0.9}
+                onPress={handleRegister}
                 disabled={loading}
               >
-                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#9e9e9e" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm password"
-                placeholderTextColor="#9e9e9e"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showConfirmPassword}
-                editable={!loading}
-              />
-              <TouchableOpacity 
-                style={styles.eyeIcon} 
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)} 
-                activeOpacity={0.7}
-                disabled={loading}
-              >
-                <Ionicons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#9e9e9e" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.phoneContainer}>
-              <TouchableOpacity style={styles.countryCode} disabled={loading}>
-                <Text style={styles.countryCodeText}>+34</Text>
-                <Ionicons name="chevron-down" size={16} color="#333" />
+                {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Register</Text>}
               </TouchableOpacity>
 
-              <TextInput
-                style={styles.phoneInput}
-                placeholder="Phone Number"
-                placeholderTextColor="#9e9e9e"
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
-                keyboardType="phone-pad"
-                editable={!loading}
-              />
+              <View style={styles.loginContainer}>
+                <Text style={styles.loginText}>Already have an account?</Text>
+                <TouchableOpacity onPress={() => navigation.navigate("Login")} disabled={loading}>
+                  <Text style={styles.loginLink}>Login</Text>
+                </TouchableOpacity>
+              </View>
             </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
 
-            <TouchableOpacity
-              style={[styles.registerButton, loading && styles.registerButtonDisabled]}
-              activeOpacity={0.9}
-              onPress={handleRegister}
-              disabled={loading}
-            >
-              {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Register</Text>}
-            </TouchableOpacity>
-
-            <View style={styles.loginContainer}>
-              <Text style={styles.loginText}>Already have an account?</Text>
-              <TouchableOpacity onPress={() => navigation.navigate("Login")} disabled={loading}>
-                <Text style={styles.loginLink}>Login</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      {/* Email Verification Modal Component */}
-      <EmailVerificationModal
-        visible={showVerificationModal}
-        email={email}
-        verificationCode={verificationCode}
-        verificationError={verificationError}
-        onClose={() => setShowVerificationModal(false)}
-        onVerify={verifyCode}
-        onResend={sendVerificationCode}
-        isResending={verificationLoading}
-      />
-    </SafeAreaView>
+        {/* Email Verification Modal Component */}
+        <EmailVerificationModal
+          visible={showVerificationModal}
+          email={email}
+          verificationCode={verificationCode}
+          verificationError={verificationError}
+          onClose={() => setShowVerificationModal(false)}
+          onVerify={verifyCode}
+          onResend={sendVerificationCode}
+          isResending={verificationLoading}
+        />
+      </SafeAreaView>
+    </AlertProvider>
   )
 }
 

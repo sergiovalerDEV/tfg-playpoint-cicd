@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import {
   SafeAreaView,
   StatusBar,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
@@ -18,12 +17,16 @@ import { useFonts } from "expo-font"
 import UserService from "../../../services/User/UserService"
 import { useTheme } from "../../../contexts/ThemeContext"
 import SecondaryPageHeader from "../../../components/headers/SecondaryPageHeader"
+import { showAlert, AlertProvider } from "../../../components/Alert"
 
 type Props = {
   navigation: any
 }
 
 const ChangePhoneNumber: React.FC<Props> = ({ navigation }) => {
+  // Ref para controlar si el componente está montado
+  const isMounted = useRef(true)
+  
   const { theme } = useTheme()
   const isDark = theme === "dark"
 
@@ -33,6 +36,13 @@ const ChangePhoneNumber: React.FC<Props> = ({ navigation }) => {
   const [confirmPhoneNumber, setConfirmPhoneNumber] = useState("")
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
+
+  // Efecto para limpiar la referencia cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      isMounted.current = false
+    }
+  }, [])
 
   // Formatear número de teléfono con guiones
   const formatPhoneWithDashes = (phoneNumber: number | undefined): string => {
@@ -57,7 +67,9 @@ const ChangePhoneNumber: React.FC<Props> = ({ navigation }) => {
       } catch (error) {
         console.error("Error al cargar el número de teléfono:", error)
       } finally {
-        setInitialLoading(false)
+        if (isMounted.current) {
+          setInitialLoading(false)
+        }
       }
     }
 
@@ -75,12 +87,12 @@ const ChangePhoneNumber: React.FC<Props> = ({ navigation }) => {
   const handleChangePhoneNumber = async () => {
     // Validaciones (mantener el código existente)
     if (!newPhoneNumber.trim() || !confirmPhoneNumber.trim()) {
-      Alert.alert("Error", "Por favor, completa todos los campos")
+      showAlert("Por favor, completa todos los campos", "error")
       return
     }
 
     if (newPhoneNumber !== confirmPhoneNumber) {
-      Alert.alert("Error", "Los números de teléfono no coinciden")
+      showAlert("Los números de teléfono no coinciden", "error")
       return
     }
 
@@ -90,7 +102,7 @@ const ChangePhoneNumber: React.FC<Props> = ({ navigation }) => {
     // Validar formato de número de teléfono (validación simple)
     const phoneRegex = /^\d{9,10}$/
     if (!phoneRegex.test(cleanedPhoneNumber)) {
-      Alert.alert("Error", "Por favor, introduce un número de teléfono válido (9-10 dígitos)")
+      showAlert("Por favor, introduce un número de teléfono válido (9-10 dígitos)", "error")
       return
     }
 
@@ -99,7 +111,7 @@ const ChangePhoneNumber: React.FC<Props> = ({ navigation }) => {
 
     // Verificar si es el mismo número
     if (phoneNumberAsNumber === currentPhoneNumber) {
-      Alert.alert("Error", "El nuevo número de teléfono debe ser diferente al actual")
+      showAlert("El nuevo número de teléfono debe ser diferente al actual", "error")
       return
     }
 
@@ -110,17 +122,21 @@ const ChangePhoneNumber: React.FC<Props> = ({ navigation }) => {
       const success = await UserService.updatePhoneNumber(phoneNumberAsNumber)
 
       if (success) {
-        Alert.alert("Éxito", "Número de teléfono actualizado correctamente", [
-          { text: "OK", onPress: () => navigation.goBack() },
-        ])
+        showAlert("Número de teléfono actualizado correctamente", "success", 3000, () => {
+          if (isMounted.current) {
+            navigation.goBack()
+          }
+        })
       } else {
-        Alert.alert("Error", "No se pudo actualizar el número de teléfono. Inténtalo de nuevo.")
+        showAlert("No se pudo actualizar el número de teléfono. Inténtalo de nuevo.", "error")
       }
     } catch (error) {
       console.error("Error al cambiar el número de teléfono:", error)
-      Alert.alert("Error", "Ocurrió un error al actualizar el número de teléfono. Por favor, inténtalo de nuevo.")
+      showAlert("Ocurrió un error al actualizar el número de teléfono. Por favor, inténtalo de nuevo.", "error")
     } finally {
-      setLoading(false)
+      if (isMounted.current) {
+        setLoading(false)
+      }
     }
   }
 
@@ -133,63 +149,65 @@ const ChangePhoneNumber: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <AlertProvider>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-      <SecondaryPageHeader text={"cambiar Número de Teléfono"} isDark={isDark}></SecondaryPageHeader>
+        <SecondaryPageHeader text={"cambiar Número de Teléfono"} isDark={isDark}></SecondaryPageHeader>
 
-      {/* Form */}
-      <View style={styles.formContainer}>
-        <View style={styles.currentInfoContainer}>
-          <Text style={styles.currentInfoLabel}>Número de teléfono actual:</Text>
-          <View style={styles.phoneNumberContainer}>
-            <Text style={styles.phonePrefix}>+34</Text>
-            <Text style={styles.currentInfoValue}>{formattedCurrentPhone}</Text>
+        {/* Form */}
+        <View style={styles.formContainer}>
+          <View style={styles.currentInfoContainer}>
+            <Text style={styles.currentInfoLabel}>Número de teléfono actual:</Text>
+            <View style={styles.phoneNumberContainer}>
+              <Text style={styles.phonePrefix}>+34</Text>
+              <Text style={styles.currentInfoValue}>{formattedCurrentPhone}</Text>
+            </View>
           </View>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Ingresa nuevo número de teléfono"
+            placeholderTextColor="#999"
+            value={newPhoneNumber}
+            onChangeText={setNewPhoneNumber}
+            keyboardType="phone-pad"
+            editable={!loading}
+            maxLength={10}
+          />
+
+          <TextInput
+            style={styles.input}
+            placeholder="Confirma número de teléfono"
+            placeholderTextColor="#999"
+            value={confirmPhoneNumber}
+            onChangeText={setConfirmPhoneNumber}
+            keyboardType="phone-pad"
+            editable={!loading}
+            maxLength={10}
+          />
+
+          <View style={styles.infoContainer}>
+            <Ionicons name="information-circle-outline" size={16} color="#666" />
+            <Text style={styles.infoText}>
+              Introduce solo los dígitos del número de teléfono, sin espacios ni guiones.
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.changeButton, loading && styles.disabledButton]}
+            onPress={handleChangePhoneNumber}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.changeButtonText}>Cambiar</Text>
+            )}
+          </TouchableOpacity>
         </View>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Ingresa nuevo número de teléfono"
-          placeholderTextColor="#999"
-          value={newPhoneNumber}
-          onChangeText={setNewPhoneNumber}
-          keyboardType="phone-pad"
-          editable={!loading}
-          maxLength={10}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Confirma número de teléfono"
-          placeholderTextColor="#999"
-          value={confirmPhoneNumber}
-          onChangeText={setConfirmPhoneNumber}
-          keyboardType="phone-pad"
-          editable={!loading}
-          maxLength={10}
-        />
-
-        <View style={styles.infoContainer}>
-          <Ionicons name="information-circle-outline" size={16} color="#666" />
-          <Text style={styles.infoText}>
-            Introduce solo los dígitos del número de teléfono, sin espacios ni guiones.
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.changeButton, loading && styles.disabledButton]}
-          onPress={handleChangePhoneNumber}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.changeButtonText}>Cambiar</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </AlertProvider>
   )
 }
 
