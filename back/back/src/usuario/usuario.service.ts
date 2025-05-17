@@ -6,7 +6,7 @@ import { ConfiguracionService } from 'src/configuracion/configuracion.service';
 import { Multer } from 'multer'; 
 import axios from 'axios';
 import { AuthService } from 'src/auth/auth.service';
-import * as bcrypt from 'bcrypt';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class UsuarioService {
@@ -41,7 +41,10 @@ export class UsuarioService {
       return { mensaje: "Usuario incorrecto" };
     }
 
-    if(!await bcrypt.compareSync(parametros.contrasena, usuario[0].contrasena)){
+    // Generar hash SHA256 de la contraseña proporcionada
+    const hashedPassword = createHash('sha256').update(parametros.contrasena).digest('hex');
+
+    if(hashedPassword !== usuario[0].contrasena){
       return { mensaje: "Contraseña incorrecta" };
     }
 

@@ -21,7 +21,8 @@ export class ConfiguracionService {
   }
 
   cambiarTema(parametros){
-    return this.configuracionRepository.update({id: parametros.configuracion}, {color_aplicacion: parametros.color_aplicacion});
+    console.log(parametros)
+    return this.configuracionRepository.update({id: parametros.id}, {color_aplicacion: parametros.color_aplicacion});
   }
 
   cambiarNotificaciones(parametros){
